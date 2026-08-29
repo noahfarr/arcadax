@@ -9,7 +9,8 @@ ARCH     ?= -march=native
 WARN     := -Wall -Wextra
 INCLUDE  := -Iinclude
 DEPFLAGS := -MMD -MP
-CFLAGS   := $(OPT) $(ARCH) $(WARN) -std=c11 -fPIC $(INCLUDE) $(DEPFLAGS)
+CFLAGS   := $(OPT) $(ARCH) $(WARN) -std=c11 -D_POSIX_C_SOURCE=200809L -fPIC \
+            $(INCLUDE) $(DEPFLAGS)
 CXXFLAGS := $(OPT) $(ARCH) $(WARN) -std=c++17 -fPIC $(INCLUDE) $(DEPFLAGS)
 LDFLAGS  :=
 LDLIBS   := -lpthread
