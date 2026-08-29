@@ -86,7 +86,7 @@ void arc_render_scratch_init(struct arc_render_scratch *scratch,
 {
 	scratch->canvas_h = ARC_FRAME_SIZE + 2 * atlas->ph;
 	scratch->canvas_w = ARC_FRAME_SIZE + 2 * atlas->pw;
-	scratch->canvas = malloc((size_t)scratch->canvas_h * scratch->canvas_w);
+	scratch->canvas = calloc((size_t)scratch->canvas_h, scratch->canvas_w);
 	scratch->canvas_keys = NULL;
 	scratch->sorted = malloc(sizeof(int32_t) * (size_t)atlas->num_slots);
 }
@@ -97,6 +97,46 @@ void arc_render_scratch_free(struct arc_render_scratch *scratch)
 	free(scratch->sorted);
 	scratch->canvas = NULL;
 	scratch->sorted = NULL;
+}
+
+#define HIGH_BITS 0x8080808080808080ULL
+
+#ifndef BLEND_WIDE_MIN
+#define BLEND_WIDE_MIN 16
+#endif
+
+static inline void blend_narrow(int8_t *dst, const int8_t *src, int32_t n)
+{
+	for (int32_t u = 0; u < n; u++) {
+		int8_t m = (int8_t)(src[u] >> 7);
+		dst[u] = (int8_t)((dst[u] & m) | (src[u] & ~m));
+	}
+}
+
+static inline void blend_wide(int8_t *dst, const int8_t *src, int32_t n)
+{
+	int32_t u = 0;
+	for (; u + 8 <= n; u += 8) {
+		uint64_t s, d;
+		memcpy(&s, src + u, 8);
+		memcpy(&d, dst + u, 8);
+		uint64_t h = s & HIGH_BITS;
+		uint64_t m = (h - (h >> 7)) | h;
+		uint64_t r = (d & m) | (s & ~m);
+		memcpy(dst + u, &r, 8);
+	}
+	for (; u < n; u++) {
+		int8_t m = (int8_t)(src[u] >> 7);
+		dst[u] = (int8_t)((dst[u] & m) | (src[u] & ~m));
+	}
+}
+
+static inline void blend_row(int8_t *dst, const int8_t *src, int32_t n)
+{
+	if (n >= BLEND_WIDE_MIN)
+		blend_wide(dst, src, n);
+	else
+		blend_narrow(dst, src, n);
 }
 
 static inline int32_t sort_key_ascending(const struct arc_sprites *s, int32_t i)
@@ -118,7 +158,8 @@ void arc_raw_render(const struct arc_sprites *s, const struct arc_camera *cam,
 	int32_t n = atlas->num_slots, ph = atlas->ph, pw = atlas->pw;
 	int32_t ch = scratch->canvas_h, cw = scratch->canvas_w;
 	int8_t *canvas = scratch->canvas;
-	memset(canvas, cam->background, (size_t)ch * cw);
+	memset(canvas + (size_t)ph * cw, cam->background,
+	       (size_t)ARC_FRAME_SIZE * cw);
 
 	int32_t *order = scratch->sorted;
 	int32_t count = 0;
@@ -147,10 +188,7 @@ void arc_raw_render(const struct arc_sprites *s, const struct arc_camera *cam,
 		for (int32_t v = y0; v < y1; v++) {
 			const int8_t *src = patch + (size_t)v * pw;
 			int8_t *dst = canvas + (size_t)(sy + v) * cw + sx;
-			for (int32_t u = x0; u < x1; u++) {
-				int8_t m = (int8_t)(src[u] >> 7);
-				dst[u] = (int8_t)((dst[u] & m) | (src[u] & ~m));
-			}
+			blend_row(dst + x0, src + x0, x1 - x0);
 		}
 	}
 
@@ -173,27 +211,47 @@ void arc_scale_and_offset(const struct arc_camera *cam, int32_t *scale,
 void arc_render(const struct arc_sprites *s, const struct arc_camera *cam,
 		struct arc_render_scratch *scratch, int8_t *frame)
 {
-	int8_t view[ARC_FRAME_SIZE * ARC_FRAME_SIZE];
-	arc_raw_render(s, cam, scratch, view);
-
 	int32_t scale, x_offset, y_offset;
 	arc_scale_and_offset(cam, &scale, &x_offset, &y_offset);
 
+	if (scale == 1 && x_offset == 0 && y_offset == 0 &&
+	    cam->width >= ARC_FRAME_SIZE && cam->height >= ARC_FRAME_SIZE) {
+		arc_raw_render(s, cam, scratch, frame);
+		return;
+	}
+
+	int8_t view[ARC_FRAME_SIZE * ARC_FRAME_SIZE];
+	arc_raw_render(s, cam, scratch, view);
+
+	int32_t gxmap[ARC_FRAME_SIZE];
+	for (int32_t c = 0; c < ARC_FRAME_SIZE; c++) {
+		int32_t gx = (c - x_offset) / scale;
+		gxmap[c] = (c >= x_offset && gx < cam->width) ?
+				   clamp(gx, 0, ARC_FRAME_SIZE - 1) :
+				   -1;
+	}
+
+	int32_t last_gy = -1;
+	const int8_t *last_dst = NULL;
 	for (int32_t r = 0; r < ARC_FRAME_SIZE; r++) {
+		int8_t *dst = frame + (size_t)r * ARC_FRAME_SIZE;
 		int32_t gy = (r - y_offset) / scale;
-		int inside_row = (r >= y_offset) && (gy < cam->height);
-		for (int32_t c = 0; c < ARC_FRAME_SIZE; c++) {
-			int32_t gx = (c - x_offset) / scale;
-			int inside = inside_row && (c >= x_offset) &&
-				     (gx < cam->width);
-			frame[(size_t)r * ARC_FRAME_SIZE + c] =
-				inside ?
-					view[(size_t)clamp(gy, 0,
-							   ARC_FRAME_SIZE - 1) *
-						     ARC_FRAME_SIZE +
-					     clamp(gx, 0, ARC_FRAME_SIZE - 1)] :
-					cam->letter_box;
+		if (r < y_offset || gy >= cam->height) {
+			memset(dst, cam->letter_box, ARC_FRAME_SIZE);
+			last_gy = -1;
+			continue;
 		}
+		if (gy == last_gy) {
+			memcpy(dst, last_dst, ARC_FRAME_SIZE);
+			continue;
+		}
+		const int8_t *row =
+			view + (size_t)clamp(gy, 0, ARC_FRAME_SIZE - 1) *
+				       ARC_FRAME_SIZE;
+		for (int32_t c = 0; c < ARC_FRAME_SIZE; c++)
+			dst[c] = gxmap[c] < 0 ? cam->letter_box : row[gxmap[c]];
+		last_gy = gy;
+		last_dst = dst;
 	}
 }
 
