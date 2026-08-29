@@ -179,6 +179,12 @@ class DslGame:
     def init(self):
         self.library.sym.game_init(self.handle)
 
+    def frame(self):
+        buf = np.zeros((64, 64), np.int8)
+        self.library.sym.game_frame(self.handle,
+                                    buf.ctypes.data_as(ctypes.c_void_p))
+        return buf
+
     def act(self, action_id, x=0, y=0):
         n = self.library.sym.game_perform_action_frames(
             self.handle, int(action_id), int(x), int(y), self._ptr,

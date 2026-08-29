@@ -99,6 +99,7 @@ class Library:
         s.game_set_level.argtypes = [v, i]
         s.game_perform_action_frames.restype = i
         s.game_perform_action_frames.argtypes = [v, i, i, i, v, i]
+        s.game_frame.argtypes = [v, v]
         s.game_state_size.restype = ctypes.c_size_t
         s.game_state_size.argtypes = [v, ctypes.c_size_t]
         s.game_save.argtypes = [v, ctypes.c_size_t, v]

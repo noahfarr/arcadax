@@ -196,10 +196,12 @@ def sample_push(rng, w=9, h=9, boxes=2, pulls=20, wall_density=0.08,
     if applied == 0:
         return None
     obj[0, py, px] = player_kind
+    pitch = int(max(1, min(64 // max(w, h), 8)))
     spec = Spec(kinds=kinds, layouts=obj, floors=floor,
                 player_kind=player_kind, win_mode=WIN_ALL_ON, win_a=box_kind,
-                win_b=goal_kind, pitch=int(min(64 // max(w, h), 8)),
-                origin_x=1, origin_y=1)
+                win_b=goal_kind, pitch=pitch,
+                origin_x=(64 - w * pitch) // 2,
+                origin_y=(64 - h * pitch) // 2)
     return Proposal(spec=spec, seed=0, mechanics={"pulls": applied})
 
 
@@ -245,10 +247,12 @@ def sample_environment(rng, levels=6):
         stack_floor.append(flr)
         meta.append({"pulls": p.mechanics["pulls"], "boxes": cfg["boxes"]})
     proto = p.spec
+    pitch = int(max(1, min(64 // max(w, h), 8)))
     spec = Spec(kinds=proto.kinds, layouts=np.stack(stack_obj),
                 floors=np.stack(stack_floor), player_kind=proto.player_kind,
                 win_mode=WIN_ALL_ON, win_a=proto.win_a, win_b=proto.win_b,
-                pitch=int(min(64 // max(w, h), 8)), origin_x=1, origin_y=1)
+                pitch=pitch, origin_x=(64 - w * pitch) // 2,
+                origin_y=(64 - h * pitch) // 2)
     return Proposal(spec=spec, seed=0, mechanics={"levels": meta})
 
 
@@ -352,10 +356,11 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
         stack_obj.append(obj)
         stack_flr.append(flr)
 
+    pitch = int(max(1, min(64 // max(w, h), 8)))
     spec = Spec(kinds=kinds, layouts=np.stack(stack_obj),
                 floors=np.stack(stack_flr), player_kind=player_k,
-                win_mode=WIN_REACH, win_a=goal_k,
-                pitch=int(min(64 // max(w, h), 8)), origin_x=1, origin_y=1,
+                win_mode=WIN_REACH, win_a=goal_k, pitch=pitch,
+                origin_x=(64 - w * pitch) // 2, origin_y=(64 - h * pitch) // 2,
                 rules=rules)
     return Proposal(spec=spec, seed=0,
                     mechanics={"kinds": chosen, "hazards": hazard_kinds})
