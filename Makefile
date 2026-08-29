@@ -37,7 +37,7 @@ HARN_OBJ := $(HARN_SRC:%.c=$(BUILD)/%.o)
 FFI_OBJ  := $(FFI_SRC:%.cc=$(BUILD)/%.o)
 ALL_OBJ  := $(CORE_OBJ) $(HARN_OBJ) $(FFI_OBJ) $(BUILD)/shims/scene_game_smoketest.o
 
-.PHONY: all lib harness ffi smoke lto pgo test bench clean clean-obj help
+.PHONY: all lib harness ffi smoke lto pgo test bench format check-format clean clean-obj help
 .DEFAULT_GOAL := all
 
 all: lib
@@ -106,6 +106,16 @@ bench: $(LIB_HARN)
 	$(PYTHON) bench/bench_all.py
 
 
+SOURCES := $(wildcard include/arc/*.h) $(wildcard src/*.c) $(wildcard src/games/*.c) \
+           $(wildcard src/games/*.h) $(wildcard shims/*.c) $(wildcard bindings/*.c) \
+           $(wildcard bindings/*.cc)
+
+format:
+	clang-format -i $(SOURCES)
+
+check-format:
+	@clang-format --dry-run --Werror $(SOURCES) && echo "formatting is clean"
+
 clean-obj:
 	rm -rf $(CORE_OBJ) $(HARN_OBJ) $(FFI_OBJ) $(ALL_OBJ:.o=.d)
 
@@ -122,6 +132,8 @@ help:
 	@echo "  pgo       profile-guided build, 3 stages"
 	@echo "  test      differential sweep against the official Python, all games"
 	@echo "  bench     per-game throughput benchmark"
+	@echo "  format    reformat the C sources in kernel style"
+	@echo "  check-format  fail if any source is not in kernel style"
 	@echo "  clean     remove $(BUILD)"
 	@echo "vars: CC CXX OPT ARCH PYTHON JAX_INCLUDE ACTIONS PGO_GAMES"
 

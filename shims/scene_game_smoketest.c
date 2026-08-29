@@ -4,121 +4,132 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct {
-    int32_t calls;
-    int32_t total_calls;
-    int32_t complete_after;
-    int32_t win_after_complete;
-    int32_t lose_after_complete;
-} StubAux;
+struct stub_aux {
+	int32_t calls;
+	int32_t total_calls;
+	int32_t complete_after;
+	int32_t win_after_complete;
+	int32_t lose_after_complete;
+};
 
-static void stub_zero_aux(void *aux) {
-    StubAux *a = (StubAux *)aux;
-    a->calls = 0;
-    a->total_calls = 0;
-    a->complete_after = 1;
-    a->win_after_complete = 0;
-    a->lose_after_complete = 0;
+static void stub_zero_aux(void *aux)
+{
+	struct stub_aux *a = (struct stub_aux *)aux;
+	a->calls = 0;
+	a->total_calls = 0;
+	a->complete_after = 1;
+	a->win_after_complete = 0;
+	a->lose_after_complete = 0;
 }
 
-static void stub_build_level(ArcSceneGame *game) { (void)game; }
-
-static void stub_step_once(ArcSceneGame *game) {
-    StubAux *aux = (StubAux *)game->aux;
-    aux->calls += 1;
-    aux->total_calls += 1;
-    if (aux->calls >= aux->complete_after) {
-        if (aux->win_after_complete) arc_scene_game_next_level(game);
-        if (aux->lose_after_complete) arc_scene_game_lose(game);
-        arc_scene_game_complete_action(game);
-        aux->calls = 0;
-    }
+static void stub_build_level(struct arc_scene_game *game)
+{
+	(void)game;
 }
 
-static void stub_render_interface(ArcSceneGame *game, int8_t *frame) {
-    (void)game;
-    (void)frame;
+static void stub_step_once(struct arc_scene_game *game)
+{
+	struct stub_aux *aux = (struct stub_aux *)game->aux;
+	aux->calls += 1;
+	aux->total_calls += 1;
+	if (aux->calls >= aux->complete_after) {
+		if (aux->win_after_complete)
+			arc_scene_game_next_level(game);
+		if (aux->lose_after_complete)
+			arc_scene_game_lose(game);
+		arc_scene_game_complete_action(game);
+		aux->calls = 0;
+	}
 }
 
-static const ArcSceneHooks stub_hooks = {stub_zero_aux, stub_build_level, stub_step_once,
-                                      stub_render_interface};
+static void stub_render_interface(struct arc_scene_game *game, int8_t *frame)
+{
+	(void)game;
+	(void)frame;
+}
 
-int main(void) {
-    ArcSceneAtlas atlas = {0};
-    int8_t dummy_pixel = -1;
-    atlas.pixels = &dummy_pixel;
-    atlas.size = 1;
-    atlas.ph = 1;
-    atlas.pw = 1;
+static const struct arc_scene_hooks stub_hooks = {
+	stub_zero_aux, stub_build_level, stub_step_once, stub_render_interface
+};
 
-    StubAux aux;
-    int32_t simple_actions[] = {1, 2, 3, 4, 5};
-    ArcSceneGame *game = arc_scene_game_new(&atlas, 4, 3, 10, &stub_hooks, &aux, NULL,
-                                     simple_actions, 5, 1, 50);
-    arc_scene_game_init(game);
+int main(void)
+{
+	struct arc_scene_atlas atlas = { 0 };
+	int8_t dummy_pixel = -1;
+	atlas.pixels = &dummy_pixel;
+	atlas.size = 1;
+	atlas.ph = 1;
+	atlas.pw = 1;
 
-    assert(game->engine.level_index == 0);
-    assert(game->engine.status == SCENE_NOT_FINISHED);
-    assert(game->engine.score == 0);
-    assert(game->engine.action_count == 0);
+	struct stub_aux aux;
+	int32_t simple_actions[] = { 1, 2, 3, 4, 5 };
+	struct arc_scene_game *game =
+		arc_scene_game_new(&atlas, 4, 3, 10, &stub_hooks, &aux, NULL,
+				   simple_actions, 5, 1, 50);
+	arc_scene_game_init(game);
 
-    aux.complete_after = 1;
-    aux.win_after_complete = 0;
-    aux.lose_after_complete = 0;
-    int32_t count = arc_scene_game_perform_action(game, 1, 0, 0);
-    assert(count == 1);
-    assert(game->engine.action_count == 1);
-    assert(game->engine.level_index == 0);
+	assert(game->engine.level_index == 0);
+	assert(game->engine.status == SCENE_NOT_FINISHED);
+	assert(game->engine.score == 0);
+	assert(game->engine.action_count == 0);
 
-    aux.win_after_complete = 1;
-    count = arc_scene_game_perform_action(game, 1, 0, 0);
-    assert(count == 2);
-    assert(game->engine.level_index == 1);
-    assert(game->engine.score == 1);
-    assert(game->engine.status == SCENE_NOT_FINISHED);
-    aux.win_after_complete = 0;
+	aux.complete_after = 1;
+	aux.win_after_complete = 0;
+	aux.lose_after_complete = 0;
+	int32_t count = arc_scene_game_perform_action(game, 1, 0, 0);
+	assert(count == 1);
+	assert(game->engine.action_count == 1);
+	assert(game->engine.level_index == 0);
 
-    aux.lose_after_complete = 1;
-    int32_t total_before = aux.total_calls;
-    count = arc_scene_game_perform_action(game, 1, 0, 0);
-    assert(count == 1);
-    assert(game->engine.status == SCENE_GAME_OVER);
-    aux.lose_after_complete = 0;
+	aux.win_after_complete = 1;
+	count = arc_scene_game_perform_action(game, 1, 0, 0);
+	assert(count == 2);
+	assert(game->engine.level_index == 1);
+	assert(game->engine.score == 1);
+	assert(game->engine.status == SCENE_NOT_FINISHED);
+	aux.win_after_complete = 0;
 
-    count = arc_scene_game_perform_action(game, 1, 0, 0);
-    assert(count == 0);
-    assert(aux.total_calls == total_before + 1);
-    assert(game->engine.status == SCENE_GAME_OVER);
+	aux.lose_after_complete = 1;
+	int32_t total_before = aux.total_calls;
+	count = arc_scene_game_perform_action(game, 1, 0, 0);
+	assert(count == 1);
+	assert(game->engine.status == SCENE_GAME_OVER);
+	aux.lose_after_complete = 0;
 
-    int32_t level_before_reset = game->engine.level_index;
-    int32_t score_before_reset = game->engine.score;
-    arc_scene_game_perform_action(game, 0, 0, 0);
-    assert(game->engine.level_index == level_before_reset);
-    assert(game->engine.score == score_before_reset);
-    assert(game->engine.status == SCENE_NOT_FINISHED);
-    assert(game->engine.action_count == 0);
+	count = arc_scene_game_perform_action(game, 1, 0, 0);
+	assert(count == 0);
+	assert(aux.total_calls == total_before + 1);
+	assert(game->engine.status == SCENE_GAME_OVER);
 
-    aux.win_after_complete = 1;
-    arc_scene_game_perform_action(game, 1, 0, 0);
-    assert(game->engine.level_index == 2);
-    assert(game->engine.status == SCENE_NOT_FINISHED);
-    count = arc_scene_game_perform_action(game, 1, 0, 0);
-    assert(count == 1);
-    assert(game->engine.status == SCENE_WIN);
-    assert(game->engine.score == 3);
-    aux.win_after_complete = 0;
+	int32_t level_before_reset = game->engine.level_index;
+	int32_t score_before_reset = game->engine.score;
+	arc_scene_game_perform_action(game, 0, 0, 0);
+	assert(game->engine.level_index == level_before_reset);
+	assert(game->engine.score == score_before_reset);
+	assert(game->engine.status == SCENE_NOT_FINISHED);
+	assert(game->engine.action_count == 0);
 
-    arc_scene_game_perform_action(game, 0, 0, 0);
-    assert(game->engine.level_index == 0);
-    assert(game->engine.score == 0);
-    assert(game->engine.status == SCENE_NOT_FINISHED);
+	aux.win_after_complete = 1;
+	arc_scene_game_perform_action(game, 1, 0, 0);
+	assert(game->engine.level_index == 2);
+	assert(game->engine.status == SCENE_NOT_FINISHED);
+	count = arc_scene_game_perform_action(game, 1, 0, 0);
+	assert(count == 1);
+	assert(game->engine.status == SCENE_WIN);
+	assert(game->engine.score == 3);
+	aux.win_after_complete = 0;
 
-    aux.complete_after = 1000;
-    count = arc_scene_game_perform_action(game, 1, 0, 0);
-    assert(count == game->max_frames);
-    assert(game->engine.action_complete == 0);
+	arc_scene_game_perform_action(game, 0, 0, 0);
+	assert(game->engine.level_index == 0);
+	assert(game->engine.score == 0);
+	assert(game->engine.status == SCENE_NOT_FINISHED);
 
-    arc_scene_game_free(game);
-    printf("scene_game smoke test: PASS\n");
-    return 0;
+	aux.complete_after = 1000;
+	count = arc_scene_game_perform_action(game, 1, 0, 0);
+	assert(count == game->max_frames);
+	assert(game->engine.action_complete == 0);
+
+	arc_scene_game_free(game);
+	printf("scene_game smoke test: PASS\n");
+	return 0;
 }

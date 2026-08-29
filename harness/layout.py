@@ -19,11 +19,12 @@ def verify(library: Library | None = None, cc: str = "cc") -> tuple[int, int, li
 
     structs = library.headers.structs
     for name in sorted(structs):
-        lines.append(f'printf("%s %zu\\n","{name}",sizeof({name}));')
+        spelling = f"struct {name}" if name in library.headers.tags else name
+        lines.append(f'printf("%s %zu\\n","{name}",sizeof({spelling}));')
         for field, _ in structs[name]._fields_:
             lines.append(
                 f'printf("%s.%s %zu\\n","{name}","{field}",'
-                f"(size_t)__builtin_offsetof({name},{field}));"
+                f"(size_t)__builtin_offsetof({spelling},{field}));"
             )
     lines.append("return 0;}")
 

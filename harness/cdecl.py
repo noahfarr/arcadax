@@ -22,9 +22,10 @@ _COMMENT = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)
 _DEFINE = re.compile(r"^\s*#\s*define\s+([A-Za-z_]\w*)\s+([^\n]+)$", re.M)
 _ENUM = re.compile(r"\benum\s*\{(.*?)\}\s*;", re.S)
 _TYPEDEF_STRUCT = re.compile(r"\btypedef\s+struct\s*\{(.*?)\}\s*([A-Za-z_]\w*)\s*;", re.S)
+_TAG_STRUCT = re.compile(r"\bstruct\s+([A-Za-z_]\w*)\s*\{(.*?)\n\}\s*;", re.S)
 _FUNC_PTR = re.compile(r"^[\w\s\*]+\(\s*\*\s*(\w+)\s*\)\s*\(")
 _DECL = re.compile(r"^(?:const\s+)?(?:struct\s+)?(\w+)\s+(.*)$", re.S)
-_ITEM = re.compile(r"^(\**)\s*(\w+)\s*((?:\[[^\]]+\])*)$")
+_ITEM = re.compile(r"^(\**)\s*(\w+)\s*((?:\[[^\]]+\]\s*)*)$")
 _DIM = re.compile(r"\[([^\]]+)\]")
 
 
@@ -32,6 +33,7 @@ class CHeaders:
     def __init__(self) -> None:
         self.constants: dict[str, int] = {}
         self.structs: dict[str, type[ctypes.Structure]] = {}
+        self.tags: set[str] = set()
 
     def load(self, *paths: str | Path) -> "CHeaders":
         for path in paths:
@@ -71,6 +73,13 @@ class CHeaders:
                 nxt += 1
 
     def _structs(self, text: str) -> None:
+        for name, body in _TAG_STRUCT.findall(text):
+            if name in self.structs:
+                continue
+            self.tags.add(name)
+            self.structs[name] = type(
+                name, (ctypes.Structure,), {"_fields_": self._fields(name, body)}
+            )
         for body, name in _TYPEDEF_STRUCT.findall(text):
             if name in self.structs:
                 continue
@@ -146,7 +155,8 @@ class CHeaders:
             return None
 
     def struct(self, name: str) -> type[ctypes.Structure]:
-        for candidate in (name, f"Arc{name}"):
+        snake = re.sub(r"_+", "_", re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower())
+        for candidate in (name, f"Arc{name}", snake, f"arc_{snake}"):
             if candidate in self.structs:
                 return self.structs[candidate]
-        raise KeyError(f"neither {name} nor Arc{name} is declared in the parsed headers")
+        raise KeyError(f"no struct matching {name!r} in the parsed headers")

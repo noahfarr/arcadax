@@ -1,0 +1,52 @@
+# Kernel coding style: Documentation/process/coding-style.rst
+BasedOnStyle: LLVM
+
+AccessModifierOffset: -4
+AlignEscapedNewlines: Left
+AlignTrailingComments: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakBeforeMultilineStrings: false
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: false
+BreakStringLiterals: false
+ColumnLimit: 80
+ContinuationIndentWidth: 8
+Cpp11BracedListStyle: false
+IndentCaseLabels: false
+IndentGotoLabels: false
+IndentWidth: 8
+IndentWrappedFunctionNames: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+PointerAlignment: Right
+ReflowComments: false
+SortIncludes: false
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+TabWidth: 8
+UseTab: Always
