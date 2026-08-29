@@ -2,6 +2,8 @@ import dataclasses
 
 import numpy as np
 
+ARC_MAX_KINDS = 16
+
 from .dsl import (BECOME, BLOCK, EMPTY, LOSE, NONE, PUSH, REMOVE, TOGGLE,
                   WIN_ALL_ON, WIN_NONE_LEFT, WIN_REACH, Kind, Spec)
 
@@ -135,7 +137,7 @@ def sample_push(rng, w=9, h=9, boxes=2, pulls=20, wall_density=0.08,
              Kind(color=int(colors[3]), on_enter=PUSH),
              Kind(color=int(colors[4]))]
 
-    floor = np.zeros((1, h, w), np.int8)
+    floor = np.full((1, h, w), EMPTY, np.int8)
     obj = np.full((1, h, w), EMPTY, np.int8)
     obj[0, 0, :] = wall_kind
     obj[0, -1, :] = wall_kind
@@ -237,7 +239,7 @@ def sample_environment(rng, levels=6):
         if p is None:
             return None
         obj = np.full((h, w), EMPTY, np.int8)
-        flr = np.zeros((h, w), np.int8)
+        flr = np.full((h, w), EMPTY, np.int8)
         obj[:] = 1
         oy = (h - cfg["h"]) // 2
         ox = (w - cfg["w"]) // 2
@@ -269,7 +271,7 @@ def randomise_appearance(rng, spec, protect=()):
         if i in protect or pitch < 3:
             kinds.append(k)
             continue
-        span = int(np.clip(round(pitch * rng.beta(1.6, 1.4)), 1, pitch))
+        span = int(np.clip(round(pitch * rng.beta(1.1, 2.2)), 1, pitch))
         slack = pitch - span
         kinds.append(dataclasses.replace(
             k, size=span,
@@ -285,7 +287,9 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
 
     rooms = num_mechanics + 1
 
-    colors = [int(c) for c in rng.permutation(PALETTE)]
+    swatch = [int(c) for c in rng.permutation(PALETTE)[:int(rng.integers(5, 8))]]
+    colors = [swatch[i % len(swatch)] for i in range(2 * ARC_MAX_KINDS)]
+    rng.shuffle(colors)
     floor_k, wall_k, player_k, goal_k = 0, 1, 2, 3
     kinds = [Kind(color=int(colors[0])),
              Kind(color=int(colors[1]), on_enter=BLOCK),
@@ -369,7 +373,7 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
     plan = levels or list(range(1, num_mechanics + 1))
     for used in plan:
         obj = np.full((h, w), wall_k, np.int8)
-        flr = np.zeros((h, w), np.int8)
+        flr = np.full((h, w), EMPTY, np.int8)
         for i in range(used + 1):
             for y, x in room_cells(i):
                 obj[y, x] = EMPTY
