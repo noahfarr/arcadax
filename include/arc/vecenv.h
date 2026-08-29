@@ -11,6 +11,24 @@ extern "C" {
 
 struct arc_vec_env;
 
+struct arc_game_spec {
+	const struct arc_level_data *levels;
+	const struct arc_hooks *hooks;
+	void *aux_array;
+	size_t aux_stride;
+	void *statics;
+	const int32_t *simple_actions;
+	int32_t num_simple;
+	int32_t has_click;
+	int32_t max_frames;
+};
+
+struct arc_vec_env *arc_vecenv_new_pool(const struct arc_game_spec *pool,
+					int32_t num_games, int32_t num_envs,
+					int32_t num_threads, uint64_t seed);
+void arc_vecenv_tasks(const struct arc_vec_env *vec, int32_t *out);
+void arc_vecenv_action_counts(const struct arc_vec_env *vec, int32_t *out);
+
 struct arc_vec_env *arc_vecenv_new(const struct arc_level_data *levels,
 				   const struct arc_hooks *hooks,
 				   void *aux_array, size_t aux_stride,

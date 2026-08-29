@@ -234,6 +234,10 @@ int32_t arc_game_perform_action_frames(struct arc_game *game, int32_t action_id,
 void arc_game_decode_action(const struct arc_game *game, int32_t action,
 			    int32_t *action_id, int32_t *x, int32_t *y)
 {
+	if (action < 0)
+		action = 0;
+	if (action >= game->num_actions)
+		action = game->num_actions - 1;
 	if (!game->has_click) {
 		*action_id = game->simple_actions[action];
 		*x = 0;

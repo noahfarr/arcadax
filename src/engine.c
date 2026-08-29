@@ -84,14 +84,21 @@ int arc_sprite_collidable(const struct arc_sprites *s, int32_t i)
 	return s->alive[i] && (s->interaction[i] % 2) == 0;
 }
 
+void arc_render_scratch_init_dims(struct arc_render_scratch *scratch,
+				  int32_t ph, int32_t pw, int32_t num_slots)
+{
+	scratch->canvas_h = ARC_FRAME_SIZE + 2 * ph;
+	scratch->canvas_w = ARC_FRAME_SIZE + 2 * pw;
+	scratch->canvas = calloc((size_t)scratch->canvas_h, scratch->canvas_w);
+	scratch->canvas_keys = NULL;
+	scratch->sorted = malloc(sizeof(int32_t) * (size_t)num_slots);
+}
+
 void arc_render_scratch_init(struct arc_render_scratch *scratch,
 			     const struct arc_atlas *atlas)
 {
-	scratch->canvas_h = ARC_FRAME_SIZE + 2 * atlas->ph;
-	scratch->canvas_w = ARC_FRAME_SIZE + 2 * atlas->pw;
-	scratch->canvas = calloc((size_t)scratch->canvas_h, scratch->canvas_w);
-	scratch->canvas_keys = NULL;
-	scratch->sorted = malloc(sizeof(int32_t) * (size_t)atlas->num_slots);
+	arc_render_scratch_init_dims(scratch, atlas->ph, atlas->pw,
+				     atlas->num_slots);
 }
 
 void arc_render_scratch_free(struct arc_render_scratch *scratch)

@@ -63,6 +63,8 @@ int arc_collides_pair(const struct arc_sprites *s, int32_t i, int32_t j,
 int arc_sprite_visible(const struct arc_sprites *s, int32_t i);
 int arc_sprite_collidable(const struct arc_sprites *s, int32_t i);
 
+void arc_render_scratch_init_dims(struct arc_render_scratch *scratch,
+				  int32_t ph, int32_t pw, int32_t num_slots);
 void arc_render_scratch_init(struct arc_render_scratch *scratch,
 			     const struct arc_atlas *atlas);
 void arc_render_scratch_free(struct arc_render_scratch *scratch);

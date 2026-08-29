@@ -16,6 +16,7 @@ struct worker_arg {
 	uint8_t *truncated;
 	int32_t *level;
 	int32_t *score;
+	struct slot *owner;
 	int reset_only;
 };
 
@@ -23,11 +24,15 @@ struct slot {
 	struct arc_vec_env *vec;
 	int32_t start;
 	int32_t end;
-	struct arc_render_scratch scratch;
+	struct arc_render_scratch *scratch;
 };
 
 struct arc_vec_env {
 	struct arc_game **games;
+	struct arc_game_spec *pool;
+	int32_t num_games;
+	int32_t *task;
+	uint32_t *rng;
 	int32_t num_envs;
 	int32_t num_threads;
 	int32_t horizon;
@@ -43,6 +48,41 @@ struct arc_vec_env {
 	int stop;
 };
 
+static int32_t draw(struct arc_vec_env *vec, int32_t i)
+{
+	uint32_t x = vec->rng[i];
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	vec->rng[i] = x;
+	return (int32_t)(x % (uint32_t)vec->num_games);
+}
+
+static void assign(struct arc_vec_env *vec, int32_t i, int32_t k,
+		   struct slot *owner)
+{
+	const struct arc_game_spec *s = &vec->pool[k];
+	if (vec->games[i])
+		arc_game_free(vec->games[i]);
+	vec->games[i] = arc_game_new(s->levels, s->hooks,
+				     (char *)s->aux_array +
+					     (size_t)i * s->aux_stride,
+				     s->statics, s->simple_actions,
+				     s->num_simple, s->has_click,
+				     s->max_frames);
+	vec->task[i] = k;
+	if (owner)
+		arc_game_share_scratch(vec->games[i], &owner->scratch[k]);
+}
+
+static void restart(struct arc_vec_env *vec, int32_t i, struct slot *owner)
+{
+	if (vec->num_games > 1)
+		assign(vec, i, draw(vec, i), owner);
+	arc_game_init(vec->games[i]);
+	vec->elapsed[i] = 0;
+}
+
 static void work(const struct worker_arg *a)
 {
 	struct arc_vec_env *vec = a->vec;
@@ -50,9 +90,8 @@ static void work(const struct worker_arg *a)
 		struct arc_game *g = vec->games[i];
 		int8_t *frame = a->obs + (size_t)i * FRAME_BYTES;
 		if (a->reset_only) {
-			arc_game_init(g);
-			vec->elapsed[i] = 0;
-			arc_game_frame(g, frame);
+			restart(vec, i, a->owner);
+			arc_game_frame(vec->games[i], frame);
 			continue;
 		}
 		int32_t reward_i;
@@ -69,9 +108,8 @@ static void work(const struct worker_arg *a)
 		if (a->score)
 			a->score[i] = g->engine.score;
 		if (term || trunc) {
-			arc_game_init(g);
-			vec->elapsed[i] = 0;
-			arc_game_frame(g, frame);
+			restart(vec, i, a->owner);
+			arc_game_frame(vec->games[i], frame);
 		}
 	}
 }
@@ -95,6 +133,7 @@ static void *attend(void *raw)
 
 		a.start = slot->start;
 		a.end = slot->end;
+		a.owner = slot;
 		work(&a);
 
 		pthread_mutex_lock(&vec->lock);
@@ -110,6 +149,7 @@ static void run(struct arc_vec_env *vec, struct worker_arg proto)
 	if (vec->num_threads <= 1) {
 		proto.start = 0;
 		proto.end = vec->num_envs;
+		proto.owner = &vec->slots[0];
 		work(&proto);
 		return;
 	}
@@ -124,6 +164,7 @@ static void run(struct arc_vec_env *vec, struct worker_arg proto)
 	struct slot *mine = &vec->slots[vec->num_threads - 1];
 	proto.start = mine->start;
 	proto.end = mine->end;
+	proto.owner = mine;
 	work(&proto);
 
 	pthread_mutex_lock(&vec->lock);
@@ -132,24 +173,25 @@ static void run(struct arc_vec_env *vec, struct worker_arg proto)
 	pthread_mutex_unlock(&vec->lock);
 }
 
-struct arc_vec_env *arc_vecenv_new(const struct arc_level_data *levels,
-				   const struct arc_hooks *hooks,
-				   void *aux_array, size_t aux_stride,
-				   void *statics, const int32_t *simple_actions,
-				   int32_t num_simple, int32_t has_click,
-				   int32_t max_frames, int32_t num_envs,
-				   int32_t num_threads)
+struct arc_vec_env *arc_vecenv_new_pool(const struct arc_game_spec *pool,
+					int32_t num_games, int32_t num_envs,
+					int32_t num_threads, uint64_t seed)
 {
 	struct arc_vec_env *vec = calloc(1, sizeof(struct arc_vec_env));
 	vec->num_envs = num_envs;
 	vec->horizon = 0;
+	vec->num_games = num_games;
+	vec->pool = calloc(num_games, sizeof(struct arc_game_spec));
+	for (int32_t k = 0; k < num_games; k++)
+		vec->pool[k] = pool[k];
 	vec->games = calloc(num_envs, sizeof(struct arc_game *));
+	vec->task = calloc(num_envs, sizeof(int32_t));
+	vec->rng = calloc(num_envs, sizeof(uint32_t));
 	vec->elapsed = calloc(num_envs, sizeof(int32_t));
 	for (int32_t i = 0; i < num_envs; i++) {
-		void *aux = (char *)aux_array + (size_t)i * aux_stride;
-		vec->games[i] = arc_game_new(levels, hooks, aux, statics,
-					     simple_actions, num_simple,
-					     has_click, max_frames);
+		uint32_t state = (uint32_t)(seed + 0x9e3779b9u * (uint32_t)i);
+		vec->rng[i] = state ? state : 1u;
+		assign(vec, i, num_games > 1 ? draw(vec, i) : 0, NULL);
 	}
 
 	int32_t nt = num_threads < 1 ? 1 : num_threads;
@@ -173,12 +215,19 @@ struct arc_vec_env *arc_vecenv_new(const struct arc_level_data *levels,
 	vec->num_threads = used;
 
 	for (int32_t t = 0; t < used; t++) {
-		arc_render_scratch_init(&vec->slots[t].scratch,
-					&vec->games[0]->atlas);
+		vec->slots[t].scratch =
+			calloc(num_games, sizeof(struct arc_render_scratch));
+		for (int32_t k = 0; k < num_games; k++) {
+			const struct arc_level_data *d = vec->pool[k].levels;
+			arc_render_scratch_init_dims(&vec->slots[t].scratch[k],
+						     d->ph, d->pw,
+						     d->num_slots);
+		}
 		for (int32_t i = vec->slots[t].start; i < vec->slots[t].end;
 		     i++)
-			arc_game_share_scratch(vec->games[i],
-					       &vec->slots[t].scratch);
+			arc_game_share_scratch(
+				vec->games[i],
+				&vec->slots[t].scratch[vec->task[i]]);
 	}
 
 	if (used > 1) {
@@ -209,17 +258,55 @@ void arc_vecenv_free(struct arc_vec_env *vec)
 	}
 	for (int32_t i = 0; i < vec->num_envs; i++)
 		arc_game_free(vec->games[i]);
-	for (int32_t t = 0; t < vec->num_threads; t++)
-		arc_render_scratch_free(&vec->slots[t].scratch);
+	for (int32_t t = 0; t < vec->num_threads; t++) {
+		for (int32_t k = 0; k < vec->num_games; k++)
+			arc_render_scratch_free(&vec->slots[t].scratch[k]);
+		free(vec->slots[t].scratch);
+	}
 	free(vec->slots);
 	free(vec->games);
+	free(vec->pool);
+	free(vec->task);
+	free(vec->rng);
 	free(vec->elapsed);
 	free(vec);
 }
 
 int32_t arc_vecenv_num_actions(const struct arc_vec_env *vec)
 {
-	return vec->games[0]->num_actions;
+	int32_t most = 0;
+	for (int32_t i = 0; i < vec->num_envs; i++)
+		if (vec->games[i]->num_actions > most)
+			most = vec->games[i]->num_actions;
+	return most;
+}
+
+void arc_vecenv_tasks(const struct arc_vec_env *vec, int32_t *out)
+{
+	for (int32_t i = 0; i < vec->num_envs; i++)
+		out[i] = vec->task[i];
+}
+
+void arc_vecenv_action_counts(const struct arc_vec_env *vec, int32_t *out)
+{
+	for (int32_t i = 0; i < vec->num_envs; i++)
+		out[i] = vec->games[i]->num_actions;
+}
+
+struct arc_vec_env *arc_vecenv_new(const struct arc_level_data *levels,
+				   const struct arc_hooks *hooks,
+				   void *aux_array, size_t aux_stride,
+				   void *statics, const int32_t *simple_actions,
+				   int32_t num_simple, int32_t has_click,
+				   int32_t max_frames, int32_t num_envs,
+				   int32_t num_threads)
+{
+	struct arc_game_spec spec = { levels,         hooks,
+				      aux_array,      aux_stride,
+				      statics,        simple_actions,
+				      num_simple,     has_click,
+				      max_frames };
+	return arc_vecenv_new_pool(&spec, 1, num_envs, num_threads, 1);
 }
 
 void arc_vecenv_reset(struct arc_vec_env *vec, int8_t *obs)
