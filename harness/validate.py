@@ -18,7 +18,8 @@ class Exploration:
 def _actions_for(game) -> list[tuple[int, int, int]]:
     spec = getattr(game, "spec", None)
     out = [(a, 0, 0) for a in (1, 2, 3, 4)]
-    if spec is not None:
+    clickable = spec is not None and any(k.on_click for k in spec.kinds)
+    if clickable:
         for cy in range(spec.grid_h):
             for cx in range(spec.grid_w):
                 out.append((6, spec.origin_x + cx * spec.pitch + spec.pitch // 2,
