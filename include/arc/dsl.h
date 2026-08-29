@@ -25,6 +25,29 @@ enum {
 
 enum { ARC_DSL_WIN_NONE_LEFT = 0, ARC_DSL_WIN_ALL_ON, ARC_DSL_WIN_REACH };
 
+enum { ARC_DSL_ON_ENTER = 0, ARC_DSL_ON_CLICK, ARC_DSL_ON_STEP };
+
+enum {
+	ARC_DSL_ALWAYS = 0,
+	ARC_DSL_IF_COUNT_LE,
+	ARC_DSL_IF_NONE_LEFT,
+	ARC_DSL_IF_ADJACENT
+};
+
+#define ARC_DSL_MAX_RULES 8
+
+struct arc_dsl_rule {
+	uint8_t trigger;
+	int8_t subject;
+	uint8_t predicate;
+	int8_t pred_a;
+	int8_t pred_b;
+	uint8_t effect;
+	int8_t effect_a;
+	int8_t effect_b;
+	uint8_t enabled;
+};
+
 struct arc_dsl_kind {
 	int8_t color;
 	uint8_t on_enter;
@@ -48,6 +71,8 @@ struct arc_dsl_spec {
 	int32_t win_a;
 	int32_t win_b;
 	int8_t background;
+	int32_t num_rules;
+	struct arc_dsl_rule rules[ARC_DSL_MAX_RULES];
 	struct arc_dsl_kind kinds[ARC_DSL_MAX_KINDS];
 	const int8_t *layout;
 	const int8_t *floor;

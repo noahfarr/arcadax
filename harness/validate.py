@@ -115,3 +115,23 @@ def certify(spec, trials: int = 10_000, horizon: int = 300, threads: int = 8,
     for g in games:
         g.close()
     return wins / trials, int(steps.value)
+
+
+def necessity(spec, aux_size: int, max_nodes: int = 30_000,
+              library=None) -> list[dict]:
+    import dataclasses
+
+    from .dsl import DslGame
+
+    report = []
+    for i, rule in enumerate(spec.rules):
+        variant = dataclasses.replace(
+            spec, rules=[dataclasses.replace(r, enabled=0 if j == i else r.enabled)
+                         for j, r in enumerate(spec.rules)])
+        g = DslGame(variant, library=library)
+        e = explore(g, aux_size, max_nodes=max_nodes)
+        g.close()
+        report.append({"rule": i, "solvable_without": e.solvable,
+                       "shortest_without": e.shortest,
+                       "necessary": not e.solvable})
+    return report

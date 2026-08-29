@@ -114,6 +114,65 @@ static void apply(struct arc_game *game, int32_t cx, int32_t cy, uint8_t effect,
 	}
 }
 
+static int32_t count_kind(const struct arc_dsl_spec *s,
+			  const struct arc_dsl_aux *aux, int8_t kind)
+{
+	int32_t n = s->grid_w * s->grid_h;
+	int32_t total = 0;
+
+	for (int32_t i = 0; i < n; i++)
+		if (aux->grid[i] == kind)
+			total++;
+	return total;
+}
+
+static int predicate_holds(const struct arc_game *game,
+			   const struct arc_dsl_rule *r, int32_t cx, int32_t cy)
+{
+	const struct arc_dsl_spec *s = spec_of(game);
+	const struct arc_dsl_aux *aux = (const struct arc_dsl_aux *)game->aux;
+	static const int32_t dx[4] = { 0, 0, -1, 1 };
+	static const int32_t dy[4] = { -1, 1, 0, 0 };
+
+	switch (r->predicate) {
+	case ARC_DSL_IF_COUNT_LE:
+		return count_kind(s, aux, r->pred_a) <= r->pred_b;
+	case ARC_DSL_IF_NONE_LEFT:
+		return count_kind(s, aux, r->pred_a) == 0;
+	case ARC_DSL_IF_ADJACENT:
+		for (int32_t i = 0; i < 4; i++) {
+			int32_t nx = cx + dx[i];
+			int32_t ny = cy + dy[i];
+
+			if (inside(s, nx, ny) &&
+			    aux->grid[idx(s, nx, ny)] == r->pred_a)
+				return 1;
+		}
+		return 0;
+	default:
+		return 1;
+	}
+}
+
+static void fire_rules(struct arc_game *game, uint8_t trigger, int8_t subject,
+		       int32_t cx, int32_t cy, int *blocked)
+{
+	const struct arc_dsl_spec *s = spec_of(game);
+
+	for (int32_t i = 0; i < s->num_rules; i++) {
+		const struct arc_dsl_rule *r = &s->rules[i];
+
+		if (!r->enabled || r->trigger != trigger)
+			continue;
+		if (r->subject >= 0 && r->subject != subject)
+			continue;
+		if (!predicate_holds(game, r, cx, cy))
+			continue;
+		apply(game, cx, cy, r->effect, r->effect_a, r->effect_b,
+		      blocked);
+	}
+}
+
 static void try_move(struct arc_game *game, int32_t dir)
 {
 	const struct arc_dsl_spec *s = spec_of(game);
@@ -145,6 +204,8 @@ static void try_move(struct arc_game *game, int32_t dir)
 		} else {
 			apply(game, nx, ny, k->on_enter, k->enter_a, k->enter_b,
 			      &blocked);
+			fire_rules(game, ARC_DSL_ON_ENTER, target, nx, ny,
+				   &blocked);
 			if (blocked)
 				return;
 		}
@@ -172,6 +233,7 @@ static void do_click(struct arc_game *game, int32_t ax, int32_t ay)
 		return;
 	apply(game, cx, cy, s->kinds[target].on_click, s->kinds[target].click_a,
 	      s->kinds[target].click_b, &blocked);
+	fire_rules(game, ARC_DSL_ON_CLICK, target, cx, cy, &blocked);
 }
 
 static void dsl_on_set_level(struct arc_game *game)
@@ -189,6 +251,13 @@ static void dsl_step_once(struct arc_game *game)
 	else if (id == ARC_ACTION6)
 		do_click(game, e->action_x, e->action_y);
 
+	{
+		int blocked = 0;
+		struct arc_dsl_aux *a = (struct arc_dsl_aux *)game->aux;
+
+		fire_rules(game, ARC_DSL_ON_STEP, -1, a->player_x, a->player_y,
+			   &blocked);
+	}
 	if (e->status == NOT_FINISHED && won(game))
 		arc_game_next_level(game);
 	arc_game_complete_action(game);

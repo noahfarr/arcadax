@@ -9,6 +9,22 @@ from .reference import Levels
 MAX_KINDS = 16
 NONE, BLOCK, REMOVE, PUSH, BECOME, TOGGLE, WIN, LOSE = range(8)
 WIN_NONE_LEFT, WIN_ALL_ON, WIN_REACH = range(3)
+ON_ENTER, ON_CLICK, ON_STEP = range(3)
+ALWAYS, IF_COUNT_LE, IF_NONE_LEFT, IF_ADJACENT = range(4)
+MAX_RULES = 8
+
+
+@dataclasses.dataclass
+class Rule:
+    trigger: int
+    subject: int
+    effect: int
+    predicate: int = ALWAYS
+    pred_a: int = -1
+    pred_b: int = -1
+    effect_a: int = -1
+    effect_b: int = -1
+    enabled: int = 1
 EMPTY = -1
 
 
@@ -36,6 +52,7 @@ class Spec:
     origin_x: int = 0
     origin_y: int = 0
     background: int = 0
+    rules: list = dataclasses.field(default_factory=list)
 
     @property
     def num_levels(self) -> int:
@@ -79,6 +96,12 @@ class DslGame:
         native.win_a = spec.win_a
         native.win_b = spec.win_b
         native.background = spec.background
+        rule_t = h.struct("arc_dsl_rule")
+        native.num_rules = len(spec.rules)
+        for i, r in enumerate(spec.rules):
+            native.rules[i] = rule_t(r.trigger, r.subject, r.predicate,
+                                     r.pred_a, r.pred_b, r.effect, r.effect_a,
+                                     r.effect_b, r.enabled)
         for i, k in enumerate(spec.kinds):
             native.kinds[i] = kind_t(k.color, k.on_enter, k.enter_a, k.enter_b,
                                      k.on_click, k.click_a, k.click_b)
