@@ -83,7 +83,7 @@ class Library:
         self.headers = CHeaders().load(
             self.root / "engine.h", self.root / "game.h", *sorted(games.glob("*.h"))
         )
-        for optional in ("scene.h", "scene_game.h"):
+        for optional in ("scene.h", "scene_game.h", "dsl.h"):
             if (self.root / optional).exists():
                 self.headers.load(self.root / optional)
         self.lib = ctypes.CDLL(str(self.path))

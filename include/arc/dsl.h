@@ -1,0 +1,73 @@
+#ifndef ARC_DSL_H
+#define ARC_DSL_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "arc/game.h"
+
+#define ARC_DSL_MAX_KINDS 16
+#define ARC_DSL_MAX_LEVELS 12
+#define ARC_DSL_MAX_GRID 32
+#define ARC_DSL_EMPTY (-1)
+
+enum {
+	ARC_DSL_NONE = 0,
+	ARC_DSL_BLOCK,
+	ARC_DSL_REMOVE,
+	ARC_DSL_PUSH,
+	ARC_DSL_BECOME,
+	ARC_DSL_TOGGLE,
+	ARC_DSL_WIN,
+	ARC_DSL_LOSE
+};
+
+enum { ARC_DSL_WIN_NONE_LEFT = 0, ARC_DSL_WIN_ALL_ON, ARC_DSL_WIN_REACH };
+
+struct arc_dsl_kind {
+	int8_t color;
+	uint8_t on_enter;
+	int8_t enter_a;
+	int8_t enter_b;
+	uint8_t on_click;
+	int8_t click_a;
+	int8_t click_b;
+};
+
+struct arc_dsl_spec {
+	int32_t num_kinds;
+	int32_t num_levels;
+	int32_t grid_w;
+	int32_t grid_h;
+	int32_t pitch;
+	int32_t origin_x;
+	int32_t origin_y;
+	int32_t player_kind;
+	int32_t win_mode;
+	int32_t win_a;
+	int32_t win_b;
+	int8_t background;
+	struct arc_dsl_kind kinds[ARC_DSL_MAX_KINDS];
+	const int8_t *layout;
+	const int8_t *floor;
+};
+
+struct arc_dsl_aux {
+	int8_t grid[ARC_DSL_MAX_GRID * ARC_DSL_MAX_GRID];
+	int8_t floor[ARC_DSL_MAX_GRID * ARC_DSL_MAX_GRID];
+	int32_t player_x;
+	int32_t player_y;
+	uint8_t settled;
+};
+
+extern const struct arc_hooks arc_dsl_hooks;
+
+void arc_dsl_zero_aux(void *aux);
+int32_t arc_dsl_num_actions(const struct arc_dsl_spec *spec);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

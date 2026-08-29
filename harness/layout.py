@@ -12,8 +12,9 @@ def verify(library: Library | None = None, cc: str = "cc") -> tuple[int, int, li
     arc = library.arc_prefix
     headers = sorted(library.games_dir.glob("*.h"))
     lines = ["#include <stdio.h>", f'#include "{arc}game.h"']
-    if (root / "scene_game.h").exists():
-        lines.append(f'#include "{arc}scene_game.h"')
+    for optional in ("scene_game.h", "dsl.h"):
+        if (root / optional).exists():
+            lines.append(f'#include "{arc}{optional}"')
     lines += [f'#include "{h.name}"' for h in headers]
     lines.append("int main(void){")
 
