@@ -387,40 +387,55 @@ static void dsl_step_once(struct arc_game *game)
 	arc_game_complete_action(game);
 }
 
+static void paint(const struct arc_dsl_spec *s, int8_t *frame, int32_t x,
+		  int32_t y, int8_t kind, int use_size)
+{
+	int8_t color = s->kinds[kind].color;
+	int32_t span = s->pitch;
+	int32_t x0, y0;
+
+	if (use_size && s->kinds[kind].size > 0 &&
+	    s->kinds[kind].size < s->pitch)
+		span = s->kinds[kind].size;
+	x0 = s->origin_x + x * s->pitch + (use_size ? s->kinds[kind].off_x : 0);
+	y0 = s->origin_y + y * s->pitch + (use_size ? s->kinds[kind].off_y : 0);
+	for (int32_t v = 0; v < span; v++) {
+		int32_t row = y0 + v;
+
+		if (row < 0 || row >= ARC_FRAME_SIZE)
+			continue;
+		for (int32_t u = 0; u < span; u++) {
+			int32_t col = x0 + u;
+
+			if (col < 0 || col >= ARC_FRAME_SIZE)
+				continue;
+			frame[row * ARC_FRAME_SIZE + col] = color;
+		}
+	}
+}
+
 static void dsl_render_interface(struct arc_game *game, int8_t *frame)
 {
 	const struct arc_dsl_spec *s = spec_of(game);
 	const struct arc_dsl_aux *aux = (const struct arc_dsl_aux *)game->aux;
 
-	for (int32_t y = 0; y < s->grid_h; y++) {
+	for (int32_t y = 0; y < s->grid_h; y++)
+		for (int32_t x = 0; x < s->grid_w; x++) {
+			int8_t floor = aux->floor[idx(s, x, y)];
+			int8_t on_top = aux->grid[idx(s, x, y)];
+
+			if (floor != ARC_DSL_EMPTY)
+				paint(s, frame, x, y, floor, 0);
+			else if (on_top != ARC_DSL_EMPTY)
+				paint(s, frame, x, y, 0, 0);
+		}
+	for (int32_t y = 0; y < s->grid_h; y++)
 		for (int32_t x = 0; x < s->grid_w; x++) {
 			int8_t kind = aux->grid[idx(s, x, y)];
-			int8_t color;
-			int32_t x0, y0;
 
-			if (kind == ARC_DSL_EMPTY)
-				kind = aux->floor[idx(s, x, y)];
-			if (kind == ARC_DSL_EMPTY)
-				continue;
-			color = s->kinds[kind].color;
-			x0 = s->origin_x + x * s->pitch;
-			y0 = s->origin_y + y * s->pitch;
-			for (int32_t v = 0; v < s->pitch; v++) {
-				int32_t row = y0 + v;
-
-				if (row < 0 || row >= ARC_FRAME_SIZE)
-					continue;
-				for (int32_t u = 0; u < s->pitch; u++) {
-					int32_t col = x0 + u;
-
-					if (col < 0 || col >= ARC_FRAME_SIZE)
-						continue;
-					frame[row * ARC_FRAME_SIZE + col] =
-						color;
-				}
-			}
+			if (kind != ARC_DSL_EMPTY)
+				paint(s, frame, x, y, kind, 1);
 		}
-	}
 }
 
 const struct arc_hooks arc_dsl_hooks = { arc_dsl_zero_aux, dsl_on_set_level,

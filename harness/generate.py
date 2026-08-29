@@ -260,16 +260,30 @@ MECHANICS = ("key", "switch", "collect")
 HAZARDS = ("patrol", "chase")
 
 
+def randomise_appearance(rng, spec, protect=()):
+    import dataclasses
+
+    pitch = spec.pitch
+    kinds = []
+    for i, k in enumerate(spec.kinds):
+        if i in protect or pitch < 3:
+            kinds.append(k)
+            continue
+        span = int(np.clip(round(pitch * rng.beta(1.6, 1.4)), 1, pitch))
+        slack = pitch - span
+        kinds.append(dataclasses.replace(
+            k, size=span,
+            off_x=int(rng.integers(0, slack + 1)),
+            off_y=int(rng.integers(0, slack + 1))))
+    return dataclasses.replace(spec, kinds=kinds)
+
+
 def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
                     hazards=0):
     from .dsl import (IF_NONE_LEFT, ON_CLICK, ON_ENTER, ON_STEP, REMOVE, Rule,
                       Spec, TOGGLE, WIN_REACH)
 
     rooms = num_mechanics + 1
-    w = rooms * room_w + rooms + 1
-    h = room_h + 2
-    if w > 32 or h > 32:
-        return None
 
     colors = [int(c) for c in rng.permutation(PALETTE)]
     floor_k, wall_k, player_k, goal_k = 0, 1, 2, 3
@@ -319,10 +333,37 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
     if len(kinds) > 16 or len(rules) > 8:
         return None
 
+    import math
+
+    cols = max(1, math.ceil(math.sqrt(rooms)))
+    grid_rows = math.ceil(rooms / cols)
+    w = cols * room_w + cols + 1
+    h = grid_rows * room_h + grid_rows + 1
+    if w > 32 or h > 32:
+        return None
+
+    def place(i):
+        r = i // cols
+        c = i % cols if r % 2 == 0 else cols - 1 - (i % cols)
+        return r, c
+
     def room_cells(i):
-        x0 = 1 + i * (room_w + 1)
-        return [(y, x) for y in range(1, h - 1)
+        r, c = place(i)
+        x0 = 1 + c * (room_w + 1)
+        y0 = 1 + r * (room_h + 1)
+        return [(y, x) for y in range(y0, y0 + room_h)
                 for x in range(x0, x0 + room_w)]
+
+    def door_between(i, j):
+        ri, ci = place(i)
+        rj, cj = place(j)
+        if ri == rj:
+            x = 1 + min(ci, cj) * (room_w + 1) + room_w
+            y = 1 + ri * (room_h + 1) + room_h // 2
+        else:
+            x = 1 + ci * (room_w + 1) + room_w // 2
+            y = 1 + min(ri, rj) * (room_h + 1) + room_h
+        return y, x
 
     stack_obj, stack_flr = [], []
     plan = levels or list(range(1, num_mechanics + 1))
@@ -332,9 +373,9 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
         for i in range(used + 1):
             for y, x in room_cells(i):
                 obj[y, x] = EMPTY
-        door_row = h // 2
         for i in range(used):
-            obj[door_row, 1 + i * (room_w + 1) + room_w] = door_kind[i]
+            dy, dx = door_between(i, i + 1)
+            obj[dy, dx] = door_kind[i]
         cells = room_cells(0)
         obj[cells[0]] = player_k
         for i in range(used):
@@ -345,12 +386,9 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
                 obj[spots[j]] = trigger_kind[i]
         for n, hk in enumerate(hazard_kinds):
             room = min(1 + n, used)
-            near = [c for c in room_cells(room)
-                    if obj[c] == EMPTY and c[0] != door_row]
-            if not near:
-                near = [c for c in room_cells(room) if obj[c] == EMPTY]
-            if len(near) > 1:
-                obj[near[0]] = hk
+            spots = [c for c in room_cells(room) if obj[c] == EMPTY]
+            if len(spots) > 2:
+                obj[spots[len(spots) // 2]] = hk
         last = [c for c in room_cells(used) if obj[c] == EMPTY]
         flr[last[-1]] = goal_k
         stack_obj.append(obj)

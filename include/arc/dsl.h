@@ -58,6 +58,9 @@ struct arc_dsl_kind {
 	int8_t motion_b;
 	uint8_t deadly;
 	uint8_t gravity;
+	int8_t size;
+	int8_t off_x;
+	int8_t off_y;
 	uint8_t on_enter;
 	int8_t enter_a;
 	int8_t enter_b;

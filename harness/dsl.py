@@ -39,6 +39,9 @@ class Kind:
     motion_b: int = -1
     deadly: int = 0
     gravity: int = 0
+    size: int = 0
+    off_x: int = 0
+    off_y: int = 0
     on_enter: int = NONE
     enter_a: int = -1
     enter_b: int = -1
@@ -113,7 +116,7 @@ class DslGame:
         for i, k in enumerate(spec.kinds):
             native.kinds[i] = kind_t(k.color, k.motion, k.motion_a,
                                      k.motion_b, k.deadly, k.gravity,
-                                     k.on_enter,
+                                     k.size, k.off_x, k.off_y, k.on_enter,
                                      k.enter_a, k.enter_b, k.on_click,
                                      k.click_a, k.click_b)
         native.layout = layout.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
