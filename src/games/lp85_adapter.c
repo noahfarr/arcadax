@@ -3,9 +3,9 @@
 
 #include <stdlib.h>
 
-static int32_t *scratch_sources;
-static int32_t *scratch_hits;
-static const struct lp85_static *scratch_for;
+static _Thread_local int32_t *scratch_sources;
+static _Thread_local int32_t *scratch_hits;
+static _Thread_local const struct lp85_static *scratch_for;
 
 static void adapt_zero_aux(void *aux)
 {
