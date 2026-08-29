@@ -298,6 +298,19 @@ void arc_vecenv_tasks(const struct arc_vec_env *vec, int32_t *out)
 		out[i] = vec->task[i];
 }
 
+void arc_vecenv_action_ids(const struct arc_vec_env *vec, int32_t *out)
+{
+	for (int32_t i = 0; i < vec->num_envs; i++) {
+		const struct arc_game *g = vec->games[i];
+		int32_t bits = 0;
+		for (int32_t k = 0; k < g->num_simple; k++)
+			bits |= 1 << g->simple_actions[k];
+		if (g->has_click)
+			bits |= 1 << ARC_ACTION6;
+		out[i] = bits;
+	}
+}
+
 void arc_vecenv_action_counts(const struct arc_vec_env *vec, int32_t *out)
 {
 	for (int32_t i = 0; i < vec->num_envs; i++)

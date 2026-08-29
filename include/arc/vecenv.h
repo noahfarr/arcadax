@@ -27,6 +27,7 @@ struct arc_vec_env *arc_vecenv_new_pool(const struct arc_game_spec *pool,
 					int32_t num_games, int32_t num_envs,
 					int32_t num_threads, uint64_t seed);
 void arc_vecenv_tasks(const struct arc_vec_env *vec, int32_t *out);
+void arc_vecenv_action_ids(const struct arc_vec_env *vec, int32_t *out);
 void arc_vecenv_action_counts(const struct arc_vec_env *vec, int32_t *out);
 
 struct arc_vec_env *arc_vecenv_new(const struct arc_level_data *levels,
