@@ -97,7 +97,8 @@ def random_solve_rate(game, trials: int = 10_000, horizon: int = 200,
 
 
 def certify(spec, trials: int = 10_000, horizon: int = 300, threads: int = 8,
-            seed: int = 1, library=None) -> tuple[float, int]:
+            seed: int = 1, library=None, start_level: int = 0
+            ) -> tuple[float, int]:
     from .dsl import DslGame
 
     games = [DslGame(spec, library=library) for _ in range(threads)]
@@ -108,7 +109,7 @@ def certify(spec, trials: int = 10_000, horizon: int = 300, threads: int = 8,
     handles = (ctypes.c_void_p * threads)(*[g.handle for g in games])
     steps = ctypes.c_int64()
     wins = library.sym.certify_random(
-        handles, threads, trials, horizon,
+        handles, threads, trials, horizon, start_level,
         flat.ctypes.data_as(ctypes.c_void_p), len(actions), seed,
         ctypes.byref(steps))
     for g in games:

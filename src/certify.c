@@ -9,6 +9,7 @@ struct worker {
 	int32_t num_actions;
 	int32_t trials;
 	int32_t horizon;
+	int32_t start_level;
 	uint32_t seed;
 	int64_t wins;
 	int64_t steps;
@@ -35,6 +36,8 @@ static void *run(void *arg)
 		int32_t start;
 
 		arc_game_init(w->game);
+		if (w->start_level > 0)
+			arc_game_set_level(w->game, w->start_level);
 		start = w->game->engine.level_index;
 		for (int32_t i = 0; i < w->horizon; i++) {
 			int32_t k = (int32_t)(next_random(&state) %
@@ -57,7 +60,7 @@ static void *run(void *arg)
 }
 
 int64_t arc_certify_random(struct arc_game **games, int32_t num_threads,
-			   int32_t trials, int32_t horizon,
+			   int32_t trials, int32_t horizon, int32_t start_level,
 			   const int32_t *actions, int32_t num_actions,
 			   uint32_t seed, int64_t *steps_out)
 {
@@ -78,6 +81,7 @@ int64_t arc_certify_random(struct arc_game **games, int32_t num_threads,
 		workers[i].trials = trials / num_threads +
 				    (i < trials % num_threads ? 1 : 0);
 		workers[i].horizon = horizon;
+		workers[i].start_level = start_level;
 		workers[i].seed = seed + (uint32_t)i * 2654435761u;
 		workers[i].wins = 0;
 		workers[i].steps = 0;
