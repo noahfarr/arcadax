@@ -39,6 +39,11 @@ struct arc_vec_env *arc_vecenv_new(const struct arc_level_data *levels,
 void arc_vecenv_free(struct arc_vec_env *vec);
 int32_t arc_vecenv_num_actions(const struct arc_vec_env *vec);
 void arc_vecenv_reset(struct arc_vec_env *vec, int8_t *obs);
+void arc_vecenv_step_trial(struct arc_vec_env *vec,
+			   const int32_t *actions,
+			   const uint8_t *restart_mask, int8_t *obs,
+			   float *reward, uint8_t *terminated,
+			   uint8_t *truncated, int32_t *level, int32_t *score);
 void arc_vecenv_step(struct arc_vec_env *vec, const int32_t *actions,
 		     int8_t *obs, float *reward, uint8_t *terminated,
 		     uint8_t *truncated, int32_t *level, int32_t *score);

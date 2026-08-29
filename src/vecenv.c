@@ -16,6 +16,7 @@ struct worker_arg {
 	uint8_t *truncated;
 	int32_t *level;
 	int32_t *score;
+	const uint8_t *restart_mask;
 	struct slot *owner;
 	int reset_only;
 };
@@ -107,9 +108,19 @@ static void work(const struct worker_arg *a)
 			a->level[i] = g->engine.level_index;
 		if (a->score)
 			a->score[i] = g->engine.score;
+		if (a->restart_mask && a->restart_mask[i]) {
+			term = 0;
+			trunc = 1;
+			a->terminated[i] = 0;
+			a->truncated[i] = 1;
+		}
 		if (term || trunc) {
 			restart(vec, i, a->owner);
 			arc_game_frame(vec->games[i], frame);
+			if (a->level)
+				a->level[i] = vec->games[i]->engine.level_index;
+			if (a->score)
+				a->score[i] = vec->games[i]->engine.score;
 		}
 	}
 }
@@ -315,6 +326,24 @@ void arc_vecenv_reset(struct arc_vec_env *vec, int8_t *obs)
 	proto.vec = vec;
 	proto.obs = obs;
 	proto.reset_only = 1;
+	run(vec, proto);
+}
+
+void arc_vecenv_step_trial(struct arc_vec_env *vec, const int32_t *actions,
+			   const uint8_t *restart_mask, int8_t *obs,
+			   float *reward, uint8_t *terminated,
+			   uint8_t *truncated, int32_t *level, int32_t *score)
+{
+	struct worker_arg proto = { 0 };
+	proto.vec = vec;
+	proto.actions = actions;
+	proto.restart_mask = restart_mask;
+	proto.obs = obs;
+	proto.reward = reward;
+	proto.terminated = terminated;
+	proto.truncated = truncated;
+	proto.level = level;
+	proto.score = score;
 	run(vec, proto);
 }
 
