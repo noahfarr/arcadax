@@ -311,6 +311,35 @@ static void move_actors(struct arc_game *game)
 	}
 }
 
+static int settle_once(struct arc_game *game)
+{
+	const struct arc_dsl_spec *s = spec_of(game);
+	struct arc_dsl_aux *aux = (struct arc_dsl_aux *)game->aux;
+	int moved = 0;
+
+	for (int32_t y = s->grid_h - 2; y >= 0; y--) {
+		for (int32_t x = 0; x < s->grid_w; x++) {
+			int8_t kind = aux->grid[idx(s, x, y)];
+			int8_t below;
+
+			if (kind < 0 || !s->kinds[kind].gravity)
+				continue;
+			below = aux->grid[idx(s, x, y + 1)];
+			if (below == (int8_t)s->player_kind) {
+				if (s->kinds[kind].deadly)
+					arc_game_lose(game);
+				continue;
+			}
+			if (below != ARC_DSL_EMPTY)
+				continue;
+			aux->grid[idx(s, x, y)] = ARC_DSL_EMPTY;
+			aux->grid[idx(s, x, y + 1)] = kind;
+			moved = 1;
+		}
+	}
+	return moved;
+}
+
 static void dsl_on_set_level(struct arc_game *game)
 {
 	load_level(game);
@@ -319,7 +348,20 @@ static void dsl_on_set_level(struct arc_game *game)
 static void dsl_step_once(struct arc_game *game)
 {
 	struct arc_engine_state *e = &game->engine;
+	struct arc_dsl_aux *aux = (struct arc_dsl_aux *)game->aux;
 	int32_t id = e->action_id;
+
+	if (aux->phase) {
+		if (settle_once(game) && aux->ticks < ARC_DSL_MAX_SETTLE) {
+			aux->ticks++;
+			return;
+		}
+		aux->phase = 0;
+		if (e->status == NOT_FINISHED && won(game))
+			arc_game_next_level(game);
+		arc_game_complete_action(game);
+		return;
+	}
 
 	if (id >= ARC_ACTION1 && id <= ARC_ACTION4)
 		try_move(game, id - ARC_ACTION1);
@@ -334,6 +376,11 @@ static void dsl_step_once(struct arc_game *game)
 
 		fire_rules(game, ARC_DSL_ON_STEP, -1, a->player_x, a->player_y,
 			   &blocked);
+	}
+	if (e->status == NOT_FINISHED && settle_once(game)) {
+		aux->phase = 1;
+		aux->ticks = 1;
+		return;
 	}
 	if (e->status == NOT_FINISHED && won(game))
 		arc_game_next_level(game);

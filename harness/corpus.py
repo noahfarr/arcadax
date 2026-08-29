@@ -13,8 +13,9 @@ def save(spec: Spec, labels: dict, path: Path) -> None:
     np.savez_compressed(
         path, layouts=spec.layouts, floors=spec.floors,
         kinds=np.array([[k.color, k.motion, k.motion_a, k.motion_b, k.deadly,
-                         k.on_enter, k.enter_a, k.enter_b, k.on_click,
-                         k.click_a, k.click_b] for k in spec.kinds], np.int32),
+                         k.gravity, k.on_enter, k.enter_a, k.enter_b,
+                         k.on_click, k.click_a, k.click_b]
+                        for k in spec.kinds], np.int32),
         params=np.array([spec.player_kind, spec.win_mode, spec.win_a,
                          spec.win_b, spec.pitch, spec.origin_x, spec.origin_y,
                          spec.background], np.int32),

@@ -37,6 +37,7 @@ enum {
 };
 
 #define ARC_DSL_MAX_RULES 8
+#define ARC_DSL_MAX_SETTLE 24
 
 struct arc_dsl_rule {
 	uint8_t trigger;
@@ -56,6 +57,7 @@ struct arc_dsl_kind {
 	int8_t motion_a;
 	int8_t motion_b;
 	uint8_t deadly;
+	uint8_t gravity;
 	uint8_t on_enter;
 	int8_t enter_a;
 	int8_t enter_b;
@@ -90,6 +92,8 @@ struct arc_dsl_aux {
 	int32_t player_x;
 	int32_t player_y;
 	uint8_t settled;
+	uint8_t phase;
+	int32_t ticks;
 };
 
 extern const struct arc_hooks arc_dsl_hooks;
