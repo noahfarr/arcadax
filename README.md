@@ -36,7 +36,7 @@ not reproducible between processes in any language.
 
 ```bash
 git clone git@github.com:noahfarr/arc.c.git
-cd arc.c/csrc
+cd arc.c
 make -j
 ```
 
