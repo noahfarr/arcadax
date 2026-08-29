@@ -253,9 +253,11 @@ def sample_environment(rng, levels=6):
 
 
 MECHANICS = ("key", "switch", "collect")
+HAZARDS = ("patrol", "chase")
 
 
-def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None):
+def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
+                    hazards=0):
     from .dsl import (IF_NONE_LEFT, ON_CLICK, ON_ENTER, ON_STEP, REMOVE, Rule,
                       Spec, TOGGLE, WIN_REACH)
 
@@ -293,6 +295,23 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None):
             rules.append(Rule(trigger=ON_STEP, subject=-1, effect=TOGGLE,
                               predicate=IF_NONE_LEFT, pred_a=t,
                               effect_a=d, effect_b=floor_k))
+    from .dsl import CHASE, PATROL
+
+    hazard_kinds = []
+    for hz in range(hazards):
+        style = str(rng.choice(HAZARDS))
+        if style == "patrol":
+            a = len(kinds)
+            kinds.append(Kind(color=int(colors[-1 - 2 * hz]), motion=PATROL,
+                              motion_a=3, motion_b=a + 1, deadly=1))
+            kinds.append(Kind(color=int(colors[-1 - 2 * hz]), motion=PATROL,
+                              motion_a=2, motion_b=a, deadly=1))
+            hazard_kinds.append(a)
+        else:
+            a = len(kinds)
+            kinds.append(Kind(color=int(colors[-1 - 2 * hz]), motion=CHASE,
+                              deadly=1))
+            hazard_kinds.append(a)
     if len(kinds) > 16 or len(rules) > 8:
         return None
 
@@ -320,6 +339,14 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None):
             count = 1 if chosen[i] != "collect" else int(rng.integers(2, 4))
             for j in range(min(count, len(spots))):
                 obj[spots[j]] = trigger_kind[i]
+        for n, hk in enumerate(hazard_kinds):
+            room = min(1 + n, used)
+            near = [c for c in room_cells(room)
+                    if obj[c] == EMPTY and c[0] != door_row]
+            if not near:
+                near = [c for c in room_cells(room) if obj[c] == EMPTY]
+            if len(near) > 1:
+                obj[near[0]] = hk
         last = [c for c in room_cells(used) if obj[c] == EMPTY]
         flr[last[-1]] = goal_k
         stack_obj.append(obj)
@@ -330,4 +357,34 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None):
                 win_mode=WIN_REACH, win_a=goal_k,
                 pitch=int(min(64 // max(w, h), 8)), origin_x=1, origin_y=1,
                 rules=rules)
-    return Proposal(spec=spec, seed=0, mechanics={"kinds": chosen})
+    return Proposal(spec=spec, seed=0,
+                    mechanics={"kinds": chosen, "hazards": hazard_kinds})
+
+
+def sample_verified(rng, aux_size, library=None, attempts=12, **kwargs):
+    import ctypes
+    import dataclasses
+
+    from .validate import necessity
+
+    for _ in range(attempts):
+        proposal = sample_composed(rng, **kwargs)
+        if proposal is None:
+            continue
+        spec = proposal.spec
+        final = dataclasses.replace(spec, layouts=spec.layouts[-1:],
+                                    floors=spec.floors[-1:])
+        report, base = necessity(final, aux_size, max_nodes=120_000,
+                                 library=library)
+        if not base.solvable:
+            continue
+        gates = [r for r in report if r["kind"] == "rule"]
+        actors = [r for r in report if r["kind"] == "actor"]
+        if any(r["role"] != "enabling" for r in gates):
+            continue
+        if actors and all(r["role"] == "decorative" for r in actors):
+            continue
+        proposal.mechanics["roles"] = report
+        proposal.mechanics["shortest"] = base.shortest
+        return proposal
+    return None

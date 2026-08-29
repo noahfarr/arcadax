@@ -121,21 +121,54 @@ def certify(spec, trials: int = 10_000, horizon: int = 300, threads: int = 8,
     return wins / trials, int(steps.value)
 
 
+def _classify(base, without) -> str:
+    if not without.solvable:
+        return "enabling"
+    if base.shortest is None or without.shortest is None:
+        return "unknown"
+    if without.shortest < base.shortest:
+        return "constraining"
+    return "decorative"
+
+
 def necessity(spec, aux_size: int, max_nodes: int = 30_000,
               library=None) -> list[dict]:
     import dataclasses
 
-    from .dsl import DslGame
+    import numpy as np
+
+    from .dsl import DslGame, EMPTY
+
+    base_game = DslGame(spec, library=library)
+    base = explore(base_game, aux_size, max_nodes=max_nodes)
+    base_game.close()
 
     report = []
-    for i, rule in enumerate(spec.rules):
+    for i in range(len(spec.rules)):
         variant = dataclasses.replace(
-            spec, rules=[dataclasses.replace(r, enabled=0 if j == i else r.enabled)
-                         for j, r in enumerate(spec.rules)])
+            spec,
+            rules=[dataclasses.replace(r, enabled=0 if j == i else r.enabled)
+                   for j, r in enumerate(spec.rules)])
         g = DslGame(variant, library=library)
         e = explore(g, aux_size, max_nodes=max_nodes)
         g.close()
-        report.append({"rule": i, "solvable_without": e.solvable,
+        report.append({"kind": "rule", "index": i,
+                       "solvable_without": e.solvable,
                        "shortest_without": e.shortest,
-                       "necessary": not e.solvable})
-    return report
+                       "role": _classify(base, e)})
+
+    present = sorted({int(v) for v in np.unique(spec.layouts)})
+    for k in present:
+        if k < 0 or not spec.kinds[k].motion:
+            continue
+        layouts = np.array(spec.layouts)
+        layouts[layouts == k] = EMPTY
+        variant = dataclasses.replace(spec, layouts=layouts)
+        g = DslGame(variant, library=library)
+        e = explore(g, aux_size, max_nodes=max_nodes)
+        g.close()
+        report.append({"kind": "actor", "index": k,
+                       "solvable_without": e.solvable,
+                       "shortest_without": e.shortest,
+                       "role": _classify(base, e)})
+    return report, base
