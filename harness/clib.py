@@ -103,6 +103,8 @@ class Library:
         s.game_state_size.argtypes = [v, ctypes.c_size_t]
         s.game_save.argtypes = [v, ctypes.c_size_t, v]
         s.game_load.argtypes = [v, ctypes.c_size_t, v]
+        s.certify_random.restype = ctypes.c_int64
+        s.certify_random.argtypes = [v, i, i, i, v, i, ctypes.c_uint32, v]
         s.game_hash.restype = ctypes.c_uint64
         s.game_hash.argtypes = [v, ctypes.c_size_t]
         for name in ("harness_score", "harness_status", "harness_level_index"):

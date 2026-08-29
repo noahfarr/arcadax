@@ -94,3 +94,23 @@ def random_solve_rate(game, trials: int = 10_000, horizon: int = 200,
             if game.state == "GAME_OVER":
                 break
     return wins / trials
+
+
+def certify(spec, trials: int = 10_000, horizon: int = 300, threads: int = 8,
+            seed: int = 1, library=None) -> tuple[float, int]:
+    from .dsl import DslGame
+
+    games = [DslGame(spec, library=library) for _ in range(threads)]
+    library = games[0].library
+    actions = _actions_for(games[0])
+    flat = np.ascontiguousarray(
+        [v for a in actions for v in a], np.int32)
+    handles = (ctypes.c_void_p * threads)(*[g.handle for g in games])
+    steps = ctypes.c_int64()
+    wins = library.sym.certify_random(
+        handles, threads, trials, horizon,
+        flat.ctypes.data_as(ctypes.c_void_p), len(actions), seed,
+        ctypes.byref(steps))
+    for g in games:
+        g.close()
+    return wins / trials, int(steps.value)
