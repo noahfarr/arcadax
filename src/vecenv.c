@@ -26,6 +26,7 @@ struct slot {
 	int32_t start;
 	int32_t end;
 	struct arc_render_scratch *scratch;
+	int8_t frame[FRAME_BYTES];
 };
 
 struct arc_vec_env {
@@ -46,8 +47,23 @@ struct arc_vec_env {
 	struct worker_arg proto;
 	int32_t generation;
 	int32_t pending;
+	int packed;
 	int stop;
 };
+
+static void emit(const struct worker_arg *a, int32_t i, struct arc_game *g)
+{
+	if (!a->vec->packed) {
+		arc_game_frame(g, a->obs + (size_t)i * FRAME_BYTES);
+		return;
+	}
+	int8_t *tmp = a->owner->frame;
+	arc_game_frame(g, tmp);
+	uint8_t *out = (uint8_t *)a->obs + (size_t)i * (FRAME_BYTES / 2);
+	for (int32_t k = 0; k < FRAME_BYTES / 2; k++)
+		out[k] = (uint8_t)((tmp[2 * k] & 0x0f) |
+				   ((tmp[2 * k + 1] & 0x0f) << 4));
+}
 
 static int32_t draw(struct arc_vec_env *vec, int32_t i)
 {
@@ -89,15 +105,24 @@ static void work(const struct worker_arg *a)
 	struct arc_vec_env *vec = a->vec;
 	for (int32_t i = a->start; i < a->end; i++) {
 		struct arc_game *g = vec->games[i];
-		int8_t *frame = a->obs + (size_t)i * FRAME_BYTES;
 		if (a->reset_only) {
 			restart(vec, i, a->owner);
-			arc_game_frame(vec->games[i], frame);
+			emit(a, i, vec->games[i]);
 			continue;
 		}
 		int32_t reward_i;
 		uint8_t term;
-		arc_game_step(g, a->actions[i], frame, &reward_i, &term);
+		arc_game_step(g, a->actions[i], a->vec->packed ? a->owner->frame
+							 : a->obs + (size_t)i * FRAME_BYTES,
+			      &reward_i, &term);
+		if (a->vec->packed) {
+			uint8_t *out = (uint8_t *)a->obs +
+				       (size_t)i * (FRAME_BYTES / 2);
+			const int8_t *tmp = a->owner->frame;
+			for (int32_t k = 0; k < FRAME_BYTES / 2; k++)
+				out[k] = (uint8_t)((tmp[2 * k] & 0x0f) |
+						   ((tmp[2 * k + 1] & 0x0f) << 4));
+		}
 		vec->elapsed[i] += 1;
 		uint8_t trunc = vec->horizon > 0 &&
 				vec->elapsed[i] >= vec->horizon && !term;
@@ -116,7 +141,7 @@ static void work(const struct worker_arg *a)
 		}
 		if (term || trunc) {
 			restart(vec, i, a->owner);
-			arc_game_frame(vec->games[i], frame);
+			emit(a, i, vec->games[i]);
 			if (a->level)
 				a->level[i] = vec->games[i]->engine.level_index;
 			if (a->score)
@@ -290,6 +315,11 @@ int32_t arc_vecenv_num_actions(const struct arc_vec_env *vec)
 		if (vec->games[i]->num_actions > most)
 			most = vec->games[i]->num_actions;
 	return most;
+}
+
+void arc_vecenv_set_packed(struct arc_vec_env *vec, int32_t packed)
+{
+	vec->packed = packed ? 1 : 0;
 }
 
 void arc_vecenv_tasks(const struct arc_vec_env *vec, int32_t *out)
