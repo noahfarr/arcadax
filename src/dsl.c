@@ -236,6 +236,81 @@ static void do_click(struct arc_game *game, int32_t ax, int32_t ay)
 	fire_rules(game, ARC_DSL_ON_CLICK, target, cx, cy, &blocked);
 }
 
+static void step_actor(struct arc_game *game, int32_t x, int32_t y, int8_t kind,
+		       uint8_t *moved)
+{
+	const struct arc_dsl_spec *s = spec_of(game);
+	struct arc_dsl_aux *aux = (struct arc_dsl_aux *)game->aux;
+	const struct arc_dsl_kind *k = &s->kinds[kind];
+	int32_t dx = 0, dy = 0, nx, ny;
+	int8_t target;
+
+	if (k->motion == ARC_DSL_PATROL) {
+		dx = DX[k->motion_a & 3];
+		dy = DY[k->motion_a & 3];
+	} else {
+		int32_t gx = aux->player_x - x;
+		int32_t gy = aux->player_y - y;
+
+		int32_t ax, ay;
+
+		if (k->motion == ARC_DSL_FLEE) {
+			gx = -gx;
+			gy = -gy;
+		}
+		ax = gx < 0 ? -gx : gx;
+		ay = gy < 0 ? -gy : gy;
+		if (ax >= ay && ax > 0)
+			dx = gx > 0 ? 1 : -1;
+		else if (ay > 0)
+			dy = gy > 0 ? 1 : -1;
+		if (dx == 0 && dy == 0)
+			return;
+	}
+	nx = x + dx;
+	ny = y + dy;
+	if (!inside(s, nx, ny)) {
+		if (k->motion == ARC_DSL_PATROL)
+			aux->grid[idx(s, x, y)] = k->motion_b;
+		return;
+	}
+	target = aux->grid[idx(s, nx, ny)];
+	if (target == (int8_t)s->player_kind) {
+		if (k->deadly)
+			arc_game_lose(game);
+		return;
+	}
+	if (target != ARC_DSL_EMPTY) {
+		if (k->motion == ARC_DSL_PATROL)
+			aux->grid[idx(s, x, y)] = k->motion_b;
+		return;
+	}
+	aux->grid[idx(s, x, y)] = ARC_DSL_EMPTY;
+	aux->grid[idx(s, nx, ny)] = kind;
+	moved[idx(s, nx, ny)] = 1;
+}
+
+static void move_actors(struct arc_game *game)
+{
+	const struct arc_dsl_spec *s = spec_of(game);
+	struct arc_dsl_aux *aux = (struct arc_dsl_aux *)game->aux;
+	uint8_t moved[ARC_DSL_MAX_GRID * ARC_DSL_MAX_GRID];
+	int32_t n = s->grid_w * s->grid_h;
+
+	memset(moved, 0, (size_t)n);
+	for (int32_t y = 0; y < s->grid_h; y++) {
+		for (int32_t x = 0; x < s->grid_w; x++) {
+			int8_t kind = aux->grid[idx(s, x, y)];
+
+			if (kind < 0 || moved[idx(s, x, y)])
+				continue;
+			if (s->kinds[kind].motion == ARC_DSL_STATIC)
+				continue;
+			step_actor(game, x, y, kind, moved);
+		}
+	}
+}
+
 static void dsl_on_set_level(struct arc_game *game)
 {
 	load_level(game);
@@ -251,6 +326,8 @@ static void dsl_step_once(struct arc_game *game)
 	else if (id == ARC_ACTION6)
 		do_click(game, e->action_x, e->action_y);
 
+	if (e->status == NOT_FINISHED && id != ARC_ACTION_RESET)
+		move_actors(game);
 	{
 		int blocked = 0;
 		struct arc_dsl_aux *a = (struct arc_dsl_aux *)game->aux;

@@ -27,6 +27,8 @@ enum { ARC_DSL_WIN_NONE_LEFT = 0, ARC_DSL_WIN_ALL_ON, ARC_DSL_WIN_REACH };
 
 enum { ARC_DSL_ON_ENTER = 0, ARC_DSL_ON_CLICK, ARC_DSL_ON_STEP };
 
+enum { ARC_DSL_STATIC = 0, ARC_DSL_CHASE, ARC_DSL_FLEE, ARC_DSL_PATROL };
+
 enum {
 	ARC_DSL_ALWAYS = 0,
 	ARC_DSL_IF_COUNT_LE,
@@ -50,6 +52,10 @@ struct arc_dsl_rule {
 
 struct arc_dsl_kind {
 	int8_t color;
+	uint8_t motion;
+	int8_t motion_a;
+	int8_t motion_b;
+	uint8_t deadly;
 	uint8_t on_enter;
 	int8_t enter_a;
 	int8_t enter_b;

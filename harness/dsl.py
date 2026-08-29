@@ -28,9 +28,16 @@ class Rule:
 EMPTY = -1
 
 
+STATIC, CHASE, FLEE, PATROL = range(4)
+
+
 @dataclasses.dataclass
 class Kind:
     color: int
+    motion: int = STATIC
+    motion_a: int = 0
+    motion_b: int = -1
+    deadly: int = 0
     on_enter: int = NONE
     enter_a: int = -1
     enter_b: int = -1
@@ -103,8 +110,10 @@ class DslGame:
                                      r.pred_a, r.pred_b, r.effect, r.effect_a,
                                      r.effect_b, r.enabled)
         for i, k in enumerate(spec.kinds):
-            native.kinds[i] = kind_t(k.color, k.on_enter, k.enter_a, k.enter_b,
-                                     k.on_click, k.click_a, k.click_b)
+            native.kinds[i] = kind_t(k.color, k.motion, k.motion_a,
+                                     k.motion_b, k.deadly, k.on_enter,
+                                     k.enter_a, k.enter_b, k.on_click,
+                                     k.click_a, k.click_b)
         native.layout = layout.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
         native.floor = floor.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
         self._keep.append(native)
