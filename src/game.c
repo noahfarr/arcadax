@@ -289,3 +289,118 @@ int32_t arc_game_step(struct arc_game *game, int32_t action, int8_t *frame,
 		arc_game_frame(game, frame);
 	return count;
 }
+
+struct arc_state_layout {
+	size_t engine;
+	size_t slots;
+	size_t tags;
+	size_t pixels;
+	size_t aux;
+};
+
+static struct arc_state_layout state_layout(const struct arc_game *game,
+					    size_t aux_size)
+{
+	struct arc_state_layout l;
+	int32_t n = game->atlas.num_slots;
+
+	l.engine = sizeof(struct arc_engine_state);
+	l.slots = (size_t)n * (6 * sizeof(int32_t) + 2 * sizeof(int8_t) +
+			       2 * sizeof(uint8_t) + 4 * sizeof(int32_t));
+	l.tags = (size_t)n * (size_t)game->atlas.num_tags;
+	l.pixels = (size_t)n * (size_t)game->atlas.ph * (size_t)game->atlas.pw;
+	l.aux = aux_size;
+	return l;
+}
+
+size_t arc_game_state_size(const struct arc_game *game, size_t aux_size)
+{
+	struct arc_state_layout l = state_layout(game, aux_size);
+
+	return l.engine + l.slots + l.tags + l.pixels + l.aux;
+}
+
+static size_t copy_block(void *dst, const void *src, size_t n, int save)
+{
+	if (save)
+		memcpy(dst, src, n);
+	else
+		memcpy((void *)src, dst, n);
+	return n;
+}
+
+static void walk_state(struct arc_game *game, size_t aux_size, void *buffer,
+		       int save)
+{
+	const struct arc_sprites *s = &game->sprites;
+	int32_t n = game->atlas.num_slots;
+	uint8_t *p = (uint8_t *)buffer;
+
+	p += copy_block(p, &game->engine, sizeof(game->engine), save);
+	p += copy_block(p, s->x, (size_t)n * sizeof(int32_t), save);
+	p += copy_block(p, s->y, (size_t)n * sizeof(int32_t), save);
+	p += copy_block(p, s->h, (size_t)n * sizeof(int32_t), save);
+	p += copy_block(p, s->w, (size_t)n * sizeof(int32_t), save);
+	p += copy_block(p, s->layer, (size_t)n * sizeof(int32_t), save);
+	p += copy_block(p, s->order, (size_t)n * sizeof(int32_t), save);
+	p += copy_block(p, s->interaction, (size_t)n, save);
+	p += copy_block(p, s->blocking, (size_t)n, save);
+	p += copy_block(p, s->alive, (size_t)n, save);
+	p += copy_block(p, s->overridden, (size_t)n, save);
+	p += copy_block(p, s->bbox, (size_t)n * 4 * sizeof(int32_t), save);
+	p += copy_block(p, s->tags, (size_t)n * (size_t)game->atlas.num_tags,
+			save);
+	p += copy_block(p, s->pixels,
+			(size_t)n * (size_t)game->atlas.ph *
+				(size_t)game->atlas.pw,
+			save);
+	if (aux_size && game->aux)
+		copy_block(p, game->aux, aux_size, save);
+}
+
+void arc_game_save(const struct arc_game *game, size_t aux_size, void *dst)
+{
+	walk_state((struct arc_game *)game, aux_size, dst, 1);
+}
+
+void arc_game_load(struct arc_game *game, size_t aux_size, const void *src)
+{
+	walk_state(game, aux_size, (void *)src, 0);
+}
+
+static uint64_t mix(uint64_t h, const void *data, size_t n)
+{
+	const uint8_t *p = (const uint8_t *)data;
+
+	for (size_t i = 0; i < n; i++) {
+		h ^= p[i];
+		h *= 1099511628211ULL;
+	}
+	return h;
+}
+
+uint64_t arc_game_hash(const struct arc_game *game, size_t aux_size)
+{
+	const struct arc_sprites *s = &game->sprites;
+	const struct arc_engine_state *e = &game->engine;
+	int32_t n = game->atlas.num_slots;
+	uint64_t h = 1469598103934665603ULL;
+
+	h = mix(h, &e->level_index, sizeof(e->level_index));
+	h = mix(h, &e->score, sizeof(e->score));
+	h = mix(h, &e->status, sizeof(e->status));
+	h = mix(h, s->x, (size_t)n * sizeof(int32_t));
+	h = mix(h, s->y, (size_t)n * sizeof(int32_t));
+	h = mix(h, s->h, (size_t)n * sizeof(int32_t));
+	h = mix(h, s->w, (size_t)n * sizeof(int32_t));
+	h = mix(h, s->layer, (size_t)n * sizeof(int32_t));
+	h = mix(h, s->interaction, (size_t)n);
+	h = mix(h, s->blocking, (size_t)n);
+	h = mix(h, s->alive, (size_t)n);
+	h = mix(h, s->tags, (size_t)n * (size_t)game->atlas.num_tags);
+	h = mix(h, s->pixels,
+		(size_t)n * (size_t)game->atlas.ph * (size_t)game->atlas.pw);
+	if (aux_size && game->aux)
+		h = mix(h, game->aux, aux_size);
+	return h;
+}

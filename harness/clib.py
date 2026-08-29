@@ -99,6 +99,12 @@ class Library:
         s.game_set_level.argtypes = [v, i]
         s.game_perform_action_frames.restype = i
         s.game_perform_action_frames.argtypes = [v, i, i, i, v, i]
+        s.game_state_size.restype = ctypes.c_size_t
+        s.game_state_size.argtypes = [v, ctypes.c_size_t]
+        s.game_save.argtypes = [v, ctypes.c_size_t, v]
+        s.game_load.argtypes = [v, ctypes.c_size_t, v]
+        s.game_hash.restype = ctypes.c_uint64
+        s.game_hash.argtypes = [v, ctypes.c_size_t]
         for name in ("harness_score", "harness_status", "harness_level_index"):
             fn = getattr(s, name)
             fn.restype, fn.argtypes = i, [v]

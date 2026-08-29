@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
+
 #include "arc/engine.h"
 
 enum { NOT_PLAYED = 0, NOT_FINISHED = 1, WIN = 2, GAME_OVER = 3 };
@@ -108,6 +110,11 @@ void arc_game_init(struct arc_game *game);
 int32_t arc_game_step(struct arc_game *game, int32_t action, int8_t *frame,
 		      int32_t *reward, uint8_t *terminated);
 void arc_game_frame(struct arc_game *game, int8_t *frame);
+
+size_t arc_game_state_size(const struct arc_game *game, size_t aux_size);
+void arc_game_save(const struct arc_game *game, size_t aux_size, void *dst);
+void arc_game_load(struct arc_game *game, size_t aux_size, const void *src);
+uint64_t arc_game_hash(const struct arc_game *game, size_t aux_size);
 
 #ifdef __cplusplus
 }
