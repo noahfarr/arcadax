@@ -204,7 +204,7 @@ def capture_scale_values() -> list[float]:
 
 def load_reference_module():
     load_reference_game(SOURCE)
-    return next(m for n, m in sys.modules.items() if n.startswith("arcadax_ref_lf52"))
+    return next(m for n, m in sys.modules.items() if n.startswith("arc_reference_lf52"))
 
 
 @dataclasses.dataclass

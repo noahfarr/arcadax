@@ -105,7 +105,7 @@ def _build_static(source: str, atlas: Atlas) -> dict[str, np.ndarray]:
     from ..scene import image_key
 
     game = load_reference_game(source)
-    module = next(m for n, m in sys.modules.items() if n.startswith(f"arcadax_ref_{GAME_ID}"))
+    module = next(m for n, m in sys.modules.items() if n.startswith(f"arc_reference_{GAME_ID}"))
     ids = {k: i for i, k in enumerate(atlas.keys)}
 
     tjdtolkmxo = module.tjdtolkmxo

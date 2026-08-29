@@ -35,7 +35,7 @@ level 0.
 | Static tables and the port's level overrides | `harness/derive/<game>.py`, from the same sources |
 | ctypes struct layouts | parsed from the C headers |
 
-Nothing in that table needs jax, and nothing imports `arcadax`. `--no-jax`
+Nothing here needs jax. `--no-jax`
 installs an import blocker that turns any attempt to load either into an error,
 so the claim is enforced rather than asserted; that is how the sweep is run
 here.

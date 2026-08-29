@@ -24,7 +24,7 @@ def main() -> int:
     parser.add_argument("--library", default=None)
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--no-jax", action="store_true",
-                        help="fail if anything tries to import jax or arcadax")
+                        help="fail if anything tries to import jax")
     parser.add_argument("--layout", action="store_true",
                         help="verify the ctypes mirrors against the C headers and exit")
     args = parser.parse_args()
@@ -32,7 +32,7 @@ def main() -> int:
     if args.no_jax:
         from . import isolation
 
-        isolation.forbid("jax", "jaxlib", "arcadax")
+        isolation.forbid("jax", "jaxlib")
 
     library = Library(path=args.library)
 
@@ -54,7 +54,7 @@ def main() -> int:
     print(f"reference arcengine, official sources in reference/")
     print(f"policy    {args.actions} actions x {args.seeds} seed(s) per level")
     print("config    derived from the official sources" +
-          ("  (jax and arcadax imports blocked)" if args.no_jax else ""))
+          ("  (jax imports blocked)" if args.no_jax else ""))
     print()
 
     for game_id in targets:

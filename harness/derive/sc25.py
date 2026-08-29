@@ -90,7 +90,7 @@ FIREBALL_BLOCK_NAMES = ("dosorb", "seofsw-dosorb", "crzdcq", "tagsmh", "seofsw-t
 
 def _load_module(source: str | Path):
     source = Path(source)
-    module = types.ModuleType(f"arcadax_sc25_probe_{source.stem.replace('-', '_')}")
+    module = types.ModuleType(f"arc_sc25_probe_{source.stem.replace('-', '_')}")
     module.__file__ = str(source)
     sys.modules[module.__name__] = module
     exec(

@@ -109,7 +109,7 @@ def _load_reference_module(source: str | Path, seed: int = 0):
     from arcengine import ARCBaseGame
 
     source = Path(source)
-    module = types.ModuleType(f"arcadax_ref_{source.stem.replace('-', '_')}_dc22")
+    module = types.ModuleType(f"arc_reference_{source.stem.replace('-', '_')}_dc22")
     module.__file__ = str(source)
     sys.modules[module.__name__] = module
     exec(compile(source.read_text(encoding="utf-8"), str(source), "exec"), module.__dict__)

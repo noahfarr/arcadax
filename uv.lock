@@ -35,14 +35,17 @@ wheels = [
 ]
 
 [[package]]
-name = "arcadax"
+name = "arc-c"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "arc-agi" },
-    { name = "jax" },
     { name = "numpy" },
-    { name = "requests" },
+]
+
+[package.optional-dependencies]
+ffi = [
+    { name = "jax" },
 ]
 
 [package.dev-dependencies]
@@ -53,10 +56,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "arc-agi", specifier = ">=0.9.9" },
-    { name = "jax", specifier = ">=0.4.35" },
+    { name = "jax", marker = "extra == 'ffi'", specifier = ">=0.4.35" },
     { name = "numpy", specifier = ">=1.26" },
-    { name = "requests", specifier = ">=2.31" },
 ]
+provides-extras = ["ffi"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.1.1" }]
