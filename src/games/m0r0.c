@@ -533,8 +533,11 @@ static void m0r0_draw_overlays(int8_t *frame, const struct arc_sprites *s,
 	int32_t scale, x_offset, y_offset;
 	arc_scale_and_offset(camera, &scale, &x_offset, &y_offset);
 
+	size_t live = (size_t)m0r0_clamp(camera->height, 0, ARC_FRAME_SIZE) *
+		      ARC_FRAME_SIZE;
+
 	uint8_t block_map[ARC_FRAME_SIZE * ARC_FRAME_SIZE];
-	memset(block_map, 0, sizeof block_map);
+	memset(block_map, 0, live);
 	int32_t bcount = st->block_count[level];
 	const int32_t *blocks =
 		st->block_slots + (size_t)level * st->max_blocks;
@@ -548,7 +551,7 @@ static void m0r0_draw_overlays(int8_t *frame, const struct arc_sprites *s,
 	}
 
 	uint8_t covered[ARC_FRAME_SIZE * ARC_FRAME_SIZE];
-	memset(covered, 0, sizeof covered);
+	memset(covered, 0, live);
 	const int32_t *slots = st->mover_slot + (size_t)level * M0R0_NUM_MOVERS;
 	for (int32_t lane = 0; lane < M0R0_NUM_MOVERS; lane++) {
 		int32_t slot = slots[lane];
@@ -561,31 +564,36 @@ static void m0r0_draw_overlays(int8_t *frame, const struct arc_sprites *s,
 
 	const uint8_t *hmap = st->hazard_map +
 			      (size_t)level * ARC_FRAME_SIZE * ARC_FRAME_SIZE;
+	int32_t cxmap[ARC_FRAME_SIZE];
+	uint8_t insidex[ARC_FRAME_SIZE], borderx[ARC_FRAME_SIZE];
+	for (int32_t c = 0; c < ARC_FRAME_SIZE; c++) {
+		int32_t gx = (c - x_offset) / scale;
+		int32_t cx = m0r0_clamp(gx, 0, ARC_FRAME_SIZE - 1);
+		int32_t left = cx * scale + x_offset;
+		cxmap[c] = cx;
+		insidex[c] = c >= x_offset && gx < camera->width;
+		borderx[c] = c == left || c == left + scale - 1;
+	}
+
 	for (int32_t r = 0; r < ARC_FRAME_SIZE; r++) {
 		int32_t gy = (r - y_offset) / scale;
-		int inside_row = r >= y_offset && gy < camera->height;
+		if (r < y_offset || gy >= camera->height)
+			continue;
 		int32_t cy = m0r0_clamp(gy, 0, ARC_FRAME_SIZE - 1);
+		int32_t top = cy * scale + y_offset;
+		int row_border = r == top || r == top + scale - 1;
+		const uint8_t *brow = block_map + (size_t)cy * ARC_FRAME_SIZE;
+		const uint8_t *hrow = hmap + (size_t)cy * ARC_FRAME_SIZE;
+		const uint8_t *crow = covered + (size_t)cy * ARC_FRAME_SIZE;
+		int8_t *frow = frame + (size_t)r * ARC_FRAME_SIZE;
 		for (int32_t c = 0; c < ARC_FRAME_SIZE; c++) {
-			int32_t gx = (c - x_offset) / scale;
-			int inside = inside_row && c >= x_offset &&
-				     gx < camera->width;
-			int32_t cx = m0r0_clamp(gx, 0, ARC_FRAME_SIZE - 1);
-			int32_t top = cy * scale + y_offset,
-				left = cx * scale + x_offset;
-			int border = r == top || r == top + scale - 1 ||
-				     c == left || c == left + scale - 1;
-			int outline =
-				inside &&
-				block_map[(size_t)cy * ARC_FRAME_SIZE + cx] &&
-				border;
-			int hatch =
-				inside &&
-				hmap[(size_t)cy * ARC_FRAME_SIZE + cx] &&
-				!covered[(size_t)cy * ARC_FRAME_SIZE + cx] &&
-				((r + c) % 2 == 1);
+			if (!insidex[c])
+				continue;
+			int32_t cx = cxmap[c];
+			int outline = brow[cx] && (row_border || borderx[c]);
+			int hatch = hrow[cx] && !crow[cx] && ((r + c) % 2 == 1);
 			if (outline || hatch)
-				frame[(size_t)r * ARC_FRAME_SIZE + c] =
-					M0R0_OVERLAY_COLOUR;
+				frow[c] = M0R0_OVERLAY_COLOUR;
 		}
 	}
 }
