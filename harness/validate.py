@@ -13,6 +13,7 @@ class Exploration:
     shortest: int | None
     exhausted: bool
     terminal_depth: int | None = None
+    path: list | None = None
 
 
 def _actions_for(game) -> list[tuple[int, int, int]]:
@@ -48,17 +49,20 @@ def explore(game, aux_size: int, max_nodes: int = 50_000,
     game.init()
     start_level = int(sym.harness_level_index(game.handle))
     root = snapshot()
-    seen = {sym.game_hash(game.handle, aux_size)}
-    frontier = deque([(root, 0)])
+    root_hash = sym.game_hash(game.handle, aux_size)
+    seen = {root_hash}
+    parent = {root_hash: (None, None)}
+    frontier = deque([(root, 0, root_hash)])
     nodes = edges = 0
     shortest = None
+    path = None
 
     while frontier:
-        state, depth = frontier.popleft()
+        state, depth, state_hash = frontier.popleft()
         nodes += 1
         if nodes > max_nodes:
             return Exploration(nodes, edges, shortest is not None, shortest,
-                               False)
+                               False, path=path)
         for action in actions:
             restore(state)
             game.act(*action)
@@ -68,6 +72,13 @@ def explore(game, aux_size: int, max_nodes: int = 50_000,
             if status == "WIN" or level > start_level:
                 if shortest is None:
                     shortest = depth + 1
+                    path = [action]
+                    back = state_hash
+                    while parent[back][0] is not None:
+                        prev, act = parent[back]
+                        path.append(act)
+                        back = prev
+                    path.reverse()
                 continue
             if status == "GAME_OVER":
                 continue
@@ -75,8 +86,10 @@ def explore(game, aux_size: int, max_nodes: int = 50_000,
             if h in seen:
                 continue
             seen.add(h)
-            frontier.append((snapshot(), depth + 1))
-    return Exploration(nodes, edges, shortest is not None, shortest, True)
+            parent[h] = (state_hash, action)
+            frontier.append((snapshot(), depth + 1, h))
+    return Exploration(nodes, edges, shortest is not None, shortest, True,
+                       path=path)
 
 
 def random_solve_rate(game, trials: int = 10_000, horizon: int = 200,
