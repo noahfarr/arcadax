@@ -15,6 +15,7 @@ typedef struct {
     uint8_t *fuse_first_cycle;
     int32_t collider_dir;
     int32_t steps;
+    int32_t *box_bbox;
 } Ka59Aux;
 
 typedef struct {

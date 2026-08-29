@@ -13,6 +13,47 @@ static inline size_t ka59_area(const Ka59Static *st) {
     return (size_t)st->ph * (size_t)st->pw;
 }
 
+static void ka59_recolor_masked(int8_t *patch, const uint8_t *mask, int8_t colour,
+                                const int32_t *box, int32_t pw) {
+    int32_t y0 = box[0], y1 = box[1], x0 = box[2], x1 = box[3];
+    for (int32_t v = y0; v < y1; v++) {
+        size_t row = (size_t)v * pw;
+        for (int32_t u = x0; u < x1; u++)
+            if (mask[row + u]) patch[row + u] = colour;
+    }
+}
+
+static void ka59_compute_box_bbox(Ka59Aux *aux, const ArcSprites *s, const Ka59Static *st,
+                                  int32_t level) {
+    const ArcAtlas *a = s->atlas;
+    int32_t ph = a->ph, pw = a->pw;
+    const int32_t *box = st->box_slots + (size_t)level * st->max_box;
+    int32_t box_n = st->box_count[level];
+    for (int32_t k = 0; k < box_n; k++) {
+        int32_t slot = box[k];
+        int32_t y0 = ph, y1 = 0, x0 = pw, x1 = 0;
+        const int8_t *patch = a->pixels + (size_t)slot * ph * pw;
+        for (int32_t v = 0; v < ph; v++) {
+            const int8_t *row = patch + (size_t)v * pw;
+            for (int32_t u = 0; u < pw; u++) {
+                if (row[u] >= 0) {
+                    if (v < y0) y0 = v;
+                    if (v + 1 > y1) y1 = v + 1;
+                    if (u < x0) x0 = u;
+                    if (u + 1 > x1) x1 = u + 1;
+                }
+            }
+        }
+        if (y1 <= y0 || x1 <= x0) {
+            y0 = 0; y1 = 0; x0 = 0; x1 = 0;
+        }
+        aux->box_bbox[slot * 4 + 0] = y0;
+        aux->box_bbox[slot * 4 + 1] = y1;
+        aux->box_bbox[slot * 4 + 2] = x0;
+        aux->box_bbox[slot * 4 + 3] = x1;
+    }
+}
+
 static void ka59_display_to_grid(const ArcCamera *camera, int32_t display_x, int32_t display_y,
                                  int32_t *world_x, int32_t *world_y, int *valid) {
     int32_t scale, x_pad, y_pad;
@@ -120,14 +161,14 @@ static int ka59_strip_touches(ArcSprites *s, const Ka59Static *st, int32_t level
 static void ka59_refresh_borders(ArcSprites *s, const Ka59Static *st, int32_t level,
                                  const Ka59Aux *aux) {
     size_t area = ka59_area(st);
+    int32_t pw = st->pw;
     const int32_t *box = st->box_slots + (size_t)level * st->max_box;
     int32_t box_n = st->box_count[level];
     for (int32_t k = 0; k < box_n; k++) {
         int32_t slot = box[k];
         int8_t *patch = arc_sprite_pixels_mut(s, slot);
         const uint8_t *mask = st->box_outline_mask + ((size_t)level * st->num_slots + slot) * area;
-        for (size_t p = 0; p < area; p++)
-            if (mask[p]) patch[p] = KA59_HIGHLIGHT;
+        ka59_recolor_masked(patch, mask, KA59_HIGHLIGHT, aux->box_bbox + slot * 4, pw);
     }
 
     int32_t active = aux->active_box;
@@ -143,15 +184,21 @@ static void ka59_refresh_borders(ArcSprites *s, const Ka59Static *st, int32_t le
     int8_t *patch = arc_sprite_pixels_mut(s, active);
     const uint8_t *edge = st->box_edge_masks +
                           (((size_t)level * st->num_slots + active) * 4) * area;
-    for (size_t p = 0; p < area; p++) {
-        int erase = 0;
-        for (int d = 0; d < 4; d++) {
-            if (touched[d] && edge[(size_t)d * area + p]) {
-                erase = 1;
-                break;
+    const int32_t *abox = aux->box_bbox + active * 4;
+    int32_t y0 = abox[0], y1 = abox[1], x0 = abox[2], x1 = abox[3];
+    for (int32_t v = y0; v < y1; v++) {
+        size_t row = (size_t)v * pw;
+        for (int32_t u = x0; u < x1; u++) {
+            size_t p = row + u;
+            int erase = 0;
+            for (int d = 0; d < 4; d++) {
+                if (touched[d] && edge[(size_t)d * area + p]) {
+                    erase = 1;
+                    break;
+                }
             }
+            if (erase) patch[p] = 0;
         }
-        if (erase) patch[p] = 0;
     }
 }
 
@@ -254,19 +301,18 @@ static void ka59_tail_with_tick(ArcSprites *s, const Ka59Static *st, int32_t lev
 static void ka59_select_box(ArcSprites *s, const Ka59Static *st, int32_t level, Ka59Aux *aux,
                             int32_t new_slot) {
     size_t area = ka59_area(st);
+    int32_t pw = st->pw;
     int32_t old_slot = aux->active_box;
 
     int8_t *old_patch = arc_sprite_pixels_mut(s, old_slot);
     const uint8_t *old_mask =
         st->center_dot_mask + ((size_t)level * st->num_slots + old_slot) * area;
-    for (size_t p = 0; p < area; p++)
-        if (old_mask[p]) old_patch[p] = KA59_DESELECTED_DOT;
+    ka59_recolor_masked(old_patch, old_mask, KA59_DESELECTED_DOT, aux->box_bbox + old_slot * 4, pw);
 
     int8_t *new_patch = arc_sprite_pixels_mut(s, new_slot);
     const uint8_t *new_mask =
         st->center_dot_mask + ((size_t)level * st->num_slots + new_slot) * area;
-    for (size_t p = 0; p < area; p++)
-        if (new_mask[p]) new_patch[p] = KA59_SELECTED_DOT;
+    ka59_recolor_masked(new_patch, new_mask, KA59_SELECTED_DOT, aux->box_bbox + new_slot * 4, pw);
 
     aux->active_box = new_slot;
 }
@@ -350,8 +396,7 @@ static void ka59_handle_move(ArcSprites *s, const Ka59Static *st, int32_t level,
         const uint8_t *edge = st->box_edge_masks +
                               ((((size_t)level * st->num_slots + active) * 4) + (size_t)dir_idx) *
                                   area;
-        for (size_t p = 0; p < area; p++)
-            if (edge[p]) patch[p] = KA59_HIGHLIGHT;
+        ka59_recolor_masked(patch, edge, KA59_HIGHLIGHT, aux->box_bbox + active * 4, st->pw);
 
         int32_t box_x = s->x[active], box_y = s->y[active];
         int32_t box_h = s->h[active], box_w = s->w[active];
@@ -580,6 +625,7 @@ void ka59_aux_alloc(Ka59Aux *aux, int32_t num_slots) {
     aux->exploding = calloc((size_t)num_slots, sizeof(uint8_t));
     aux->fuse_progress = calloc((size_t)num_slots, sizeof(int32_t));
     aux->fuse_first_cycle = calloc((size_t)num_slots, sizeof(uint8_t));
+    aux->box_bbox = calloc((size_t)num_slots * 4, sizeof(int32_t));
     aux->active_box = 0;
     aux->retry_frame = 0;
     aux->collider_dir = -1;
@@ -594,6 +640,7 @@ void ka59_aux_free(Ka59Aux *aux) {
     free(aux->exploding);
     free(aux->fuse_progress);
     free(aux->fuse_first_cycle);
+    free(aux->box_bbox);
     aux->push_active = NULL;
     aux->recoil_dx = NULL;
     aux->recoil_dy = NULL;
@@ -601,6 +648,7 @@ void ka59_aux_free(Ka59Aux *aux) {
     aux->exploding = NULL;
     aux->fuse_progress = NULL;
     aux->fuse_first_cycle = NULL;
+    aux->box_bbox = NULL;
 }
 
 void ka59_zero_aux(Ka59Aux *aux, const Ka59Static *st) {
@@ -623,13 +671,13 @@ void ka59_on_set_level(ArcSprites *sprites, const Ka59Static *st, int32_t level,
                        int32_t *next_order) {
     *next_order = st->num_slots;
     ka59_zero_aux(aux, st);
+    ka59_compute_box_bbox(aux, sprites, st, level);
 
     int32_t active = st->first_box[level];
     size_t area = ka59_area(st);
     int8_t *patch = arc_sprite_pixels_mut(sprites, active);
     const uint8_t *mask = st->center_dot_mask + ((size_t)level * st->num_slots + active) * area;
-    for (size_t p = 0; p < area; p++)
-        if (mask[p]) patch[p] = KA59_SELECTED_DOT;
+    ka59_recolor_masked(patch, mask, KA59_SELECTED_DOT, aux->box_bbox + active * 4, st->pw);
 
     aux->active_box = active;
     aux->steps = st->step_budget[level];

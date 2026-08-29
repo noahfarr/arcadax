@@ -29,13 +29,13 @@ LIB_FFI  := $(BUILD)/libarc_ffi.$(SO)
 SMOKE    := $(BUILD)/scene_game_smoketest
 
 CORE_SRC := $(wildcard src/*.c) $(wildcard src/games/*.c)
-HARN_SRC := $(filter-out harness/scene_game_smoketest.c,$(wildcard harness/*.c))
+HARN_SRC := $(filter-out shims/scene_game_smoketest.c,$(wildcard shims/*.c))
 FFI_SRC  := bindings/ffi_typed.cc
 
 CORE_OBJ := $(CORE_SRC:%.c=$(BUILD)/%.o)
 HARN_OBJ := $(HARN_SRC:%.c=$(BUILD)/%.o)
 FFI_OBJ  := $(FFI_SRC:%.cc=$(BUILD)/%.o)
-ALL_OBJ  := $(CORE_OBJ) $(HARN_OBJ) $(FFI_OBJ) $(BUILD)/harness/scene_game_smoketest.o
+ALL_OBJ  := $(CORE_OBJ) $(HARN_OBJ) $(FFI_OBJ) $(BUILD)/shims/scene_game_smoketest.o
 
 .PHONY: all lib harness ffi smoke lto pgo test bench clean clean-obj help
 .DEFAULT_GOAL := all
@@ -59,7 +59,7 @@ $(LIB_FFI): $(CORE_OBJ) $(HARN_OBJ) $(FFI_OBJ)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SHARED) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-$(SMOKE): $(BUILD)/harness/scene_game_smoketest.o $(CORE_OBJ)
+$(SMOKE): $(BUILD)/shims/scene_game_smoketest.o $(CORE_OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 $(BUILD)/%.o: %.c

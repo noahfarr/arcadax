@@ -21,14 +21,21 @@ not against a sibling port.
 
 ## Status
 
-All 25 public ARC-AGI-3 environments are implemented. 23 of 25 are verified
-frame-exact against the upstream Python reference across every level, 3 seeds
-and 120 actions each. The two scene-backend games (`bp35`, `lf52`) are
-currently verified against the JAX implementation only.
+All 25 public ARC-AGI-3 environments are implemented. 23 of them are verified
+frame-exact against the official Python, every level, 120 actions each:
 
-`lf52` cannot be fully verified against the reference: it calls
-`np.random.shuffle` on numpy's unseeded global `RandomState`, so that region is
-not reproducible between processes in any language.
+```
+23 games, 164 runs, 19,772 actions and 37,658 frames verified in 19s
+```
+
+Two gaps. `g50t` level 5 emits seven frames where the reference emits eight,
+the missing one a duplicate of the last. `bp35` and `lf52` run on the scene
+backend, which needs a separate construction path in the harness and is not
+wired up yet.
+
+`lf52` also cannot be fully verified against the reference in any language: it
+calls `np.random.shuffle` on numpy's unseeded global `RandomState`, so that
+region is not reproducible between processes.
 
 ## Quickstart
 
@@ -40,9 +47,20 @@ cd arc.c
 make -j
 ```
 
-That builds `libarc`. `make ffi` adds the XLA custom call (needs jax installed
-for its headers), `make pgo` does a profile-guided build.
+That builds `libarc`, which has no dependencies at all. `make pgo` does a
+profile-guided build.
 
-The differential harnesses live on the
-[`jax-environments`](https://github.com/noahfarr/arc.c/tree/jax-environments)
-branch, alongside the JAX implementation they compare against.
+To check it against the official Python:
+
+```bash
+uv run python -m harness           # every game, every level
+uv run python -m harness --layout  # struct mirrors vs the compiler
+```
+
+The harness needs `arc-agi` and `numpy`, and nothing else. See
+[harness/README.md](harness/README.md) for what it checks and why it compares
+only against the official implementation.
+
+`make ffi` builds the XLA custom call so JAX can drive the library without
+leaving the compiled program. That is the only part of this repo that involves
+JAX, and it needs the jax headers: `uv sync --extra ffi`.

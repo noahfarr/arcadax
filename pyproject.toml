@@ -1,0 +1,18 @@
+[project]
+name = "arc-c"
+version = "0.1.0"
+description = "The ARC-AGI-3 interactive environments, in C"
+requires-python = ">=3.11"
+dependencies = [
+    "arc-agi>=0.9.9",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+ffi = ["jax>=0.4.35"]
+
+[dependency-groups]
+dev = ["pytest>=9.1.1"]
+
+[tool.setuptools]
+packages = ["harness"]
