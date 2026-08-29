@@ -18,7 +18,11 @@ class Exploration:
 def _actions_for(game) -> list[tuple[int, int, int]]:
     spec = getattr(game, "spec", None)
     out = [(a, 0, 0) for a in (1, 2, 3, 4)]
-    clickable = spec is not None and any(k.on_click for k in spec.kinds)
+    from .dsl import ON_CLICK
+
+    clickable = spec is not None and (
+        any(k.on_click for k in spec.kinds)
+        or any(r.trigger == ON_CLICK and r.enabled for r in spec.rules))
     if clickable:
         for cy in range(spec.grid_h):
             for cx in range(spec.grid_w):

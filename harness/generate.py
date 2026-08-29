@@ -250,3 +250,84 @@ def sample_environment(rng, levels=6):
                 win_mode=WIN_ALL_ON, win_a=proto.win_a, win_b=proto.win_b,
                 pitch=int(min(64 // max(w, h), 8)), origin_x=1, origin_y=1)
     return Proposal(spec=spec, seed=0, mechanics={"levels": meta})
+
+
+MECHANICS = ("key", "switch", "collect")
+
+
+def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None):
+    from .dsl import (IF_NONE_LEFT, ON_CLICK, ON_ENTER, ON_STEP, REMOVE, Rule,
+                      Spec, TOGGLE, WIN_REACH)
+
+    rooms = num_mechanics + 1
+    w = rooms * room_w + rooms + 1
+    h = room_h + 2
+    if w > 32 or h > 32:
+        return None
+
+    colors = [int(c) for c in rng.permutation(PALETTE)]
+    floor_k, wall_k, player_k, goal_k = 0, 1, 2, 3
+    kinds = [Kind(color=int(colors[0])),
+             Kind(color=int(colors[1]), on_enter=BLOCK),
+             Kind(color=int(colors[2])),
+             Kind(color=int(colors[3]))]
+    rules = []
+    door_kind, trigger_kind, chosen = [], [], []
+    for m in range(num_mechanics):
+        kind = str(rng.choice(MECHANICS))
+        chosen.append(kind)
+        d = len(kinds)
+        kinds.append(Kind(color=int(colors[4 + 2 * m]), on_enter=BLOCK))
+        t = len(kinds)
+        kinds.append(Kind(color=int(colors[5 + 2 * m]),
+                          on_enter=REMOVE if kind != "switch" else NONE))
+        door_kind.append(d)
+        trigger_kind.append(t)
+        if kind == "key":
+            rules.append(Rule(trigger=ON_ENTER, subject=t, effect=TOGGLE,
+                              effect_a=d, effect_b=floor_k))
+        elif kind == "switch":
+            rules.append(Rule(trigger=ON_CLICK, subject=t, effect=TOGGLE,
+                              effect_a=d, effect_b=floor_k))
+        else:
+            rules.append(Rule(trigger=ON_STEP, subject=-1, effect=TOGGLE,
+                              predicate=IF_NONE_LEFT, pred_a=t,
+                              effect_a=d, effect_b=floor_k))
+    if len(kinds) > 16 or len(rules) > 8:
+        return None
+
+    def room_cells(i):
+        x0 = 1 + i * (room_w + 1)
+        return [(y, x) for y in range(1, h - 1)
+                for x in range(x0, x0 + room_w)]
+
+    stack_obj, stack_flr = [], []
+    plan = levels or list(range(1, num_mechanics + 1))
+    for used in plan:
+        obj = np.full((h, w), wall_k, np.int8)
+        flr = np.zeros((h, w), np.int8)
+        for i in range(used + 1):
+            for y, x in room_cells(i):
+                obj[y, x] = EMPTY
+        door_row = h // 2
+        for i in range(used):
+            obj[door_row, 1 + i * (room_w + 1) + room_w] = door_kind[i]
+        cells = room_cells(0)
+        obj[cells[0]] = player_k
+        for i in range(used):
+            spots = [c for c in room_cells(i) if obj[c] == EMPTY]
+            rng.shuffle(spots)
+            count = 1 if chosen[i] != "collect" else int(rng.integers(2, 4))
+            for j in range(min(count, len(spots))):
+                obj[spots[j]] = trigger_kind[i]
+        last = [c for c in room_cells(used) if obj[c] == EMPTY]
+        flr[last[-1]] = goal_k
+        stack_obj.append(obj)
+        stack_flr.append(flr)
+
+    spec = Spec(kinds=kinds, layouts=np.stack(stack_obj),
+                floors=np.stack(stack_flr), player_kind=player_k,
+                win_mode=WIN_REACH, win_a=goal_k,
+                pitch=int(min(64 // max(w, h), 8)), origin_x=1, origin_y=1,
+                rules=rules)
+    return Proposal(spec=spec, seed=0, mechanics={"kinds": chosen})
