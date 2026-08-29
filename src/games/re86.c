@@ -21,17 +21,7 @@ static inline int32_t snap3(int32_t z)
 
 static int8_t *mut_pixels(struct arc_sprites *s, int32_t i)
 {
-	int32_t area = s->atlas->ph * s->atlas->pw;
-	int8_t *dst = s->pixels + (size_t)i * area;
-	if (!s->overridden[i]) {
-		memcpy(dst, s->atlas->pixels + (size_t)i * area, (size_t)area);
-		s->overridden[i] = 1;
-		s->bbox[i * 4 + 0] = 0;
-		s->bbox[i * 4 + 1] = s->atlas->ph;
-		s->bbox[i * 4 + 2] = 0;
-		s->bbox[i * 4 + 3] = s->atlas->pw;
-	}
-	return dst;
+	return arc_sprite_pixels_mut(s, i);
 }
 
 static inline int8_t center_value(const struct arc_sprites *s, int32_t slot)

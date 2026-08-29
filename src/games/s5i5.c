@@ -60,18 +60,7 @@ void s5i5_on_set_level(struct s5i5_aux *aux, const struct s5i5_static *st,
 
 static int8_t *sprite_pixels_mut_(struct arc_sprites *s, int32_t i)
 {
-	const struct arc_atlas *a = s->atlas;
-	int32_t area = a->ph * a->pw;
-	int8_t *dst = s->pixels + (size_t)i * (size_t)area;
-	if (!s->overridden[i]) {
-		memcpy(dst, a->pixels + (size_t)i * (size_t)area, (size_t)area);
-		s->overridden[i] = 1;
-		s->bbox[i * 4 + 0] = 0;
-		s->bbox[i * 4 + 1] = a->ph;
-		s->bbox[i * 4 + 2] = 0;
-		s->bbox[i * 4 + 3] = a->pw;
-	}
-	return dst;
+	return arc_sprite_pixels_mut(s, i);
 }
 
 static int32_t rotation_of(const struct arc_sprites *s, int32_t slot)

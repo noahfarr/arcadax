@@ -14,18 +14,7 @@ enum {
 
 static int8_t *ft09_pixels_mut(struct arc_sprites *s, int32_t i)
 {
-	const struct arc_atlas *a = s->atlas;
-	int32_t area = a->ph * a->pw;
-	int8_t *dst = s->pixels + (size_t)i * area;
-	if (!s->overridden[i]) {
-		memcpy(dst, a->pixels + (size_t)i * area, (size_t)area);
-		s->overridden[i] = 1;
-		s->bbox[i * 4 + 0] = 0;
-		s->bbox[i * 4 + 1] = a->ph;
-		s->bbox[i * 4 + 2] = 0;
-		s->bbox[i * 4 + 3] = a->pw;
-	}
-	return dst;
+	return arc_sprite_pixels_mut(s, i);
 }
 
 static void ft09_cell_at(const struct arc_sprites *s,

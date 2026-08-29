@@ -43,6 +43,7 @@ struct arc_sprites {
 	uint8_t *tags;
 	int8_t *pixels;
 	uint8_t *overridden;
+	uint8_t *solid;
 	const struct arc_atlas *atlas;
 	int32_t *bbox;
 };

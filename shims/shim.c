@@ -35,6 +35,7 @@ struct arc_world *arc_world_new(int32_t num_slots, int32_t num_tags, int32_t ph,
 		memcpy(s->tags, tags, (size_t)num_slots * num_tags);
 	s->pixels = calloc((size_t)num_slots * ph * pw, 1);
 	s->overridden = calloc(num_slots, 1);
+	s->solid = calloc(num_slots, 1);
 	s->bbox = calloc((size_t)num_slots * 4, sizeof(int32_t));
 	arc_sprites_recompute_bbox(s);
 	arc_render_scratch_init(&world->scratch, &world->atlas);
@@ -56,6 +57,7 @@ void arc_world_free(struct arc_world *world)
 	free(s->tags);
 	free(s->pixels);
 	free(s->overridden);
+	free(s->solid);
 	free(s->bbox);
 	arc_render_scratch_free(&world->scratch);
 	free(world);

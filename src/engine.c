@@ -28,6 +28,7 @@ int8_t *arc_sprite_pixels_mut(struct arc_sprites *s, int32_t i)
 	if (!s->overridden[i]) {
 		memcpy(dst, s->atlas->pixels + (size_t)i * area, (size_t)area);
 		s->overridden[i] = 1;
+		s->solid[i] = 0;
 		s->bbox[i * 4 + 0] = 0;
 		s->bbox[i * 4 + 1] = s->atlas->ph;
 		s->bbox[i * 4 + 2] = 0;
@@ -42,11 +43,12 @@ void arc_sprites_recompute_bbox(struct arc_sprites *s)
 	int32_t ph = a->ph, pw = a->pw;
 	for (int32_t i = 0; i < a->num_slots; i++) {
 		const int8_t *patch = arc_sprite_pixels(s, i);
-		int32_t y0 = ph, y1 = 0, x0 = pw, x1 = 0;
+		int32_t y0 = ph, y1 = 0, x0 = pw, x1 = 0, count = 0;
 		for (int32_t v = 0; v < ph; v++) {
 			const int8_t *row = patch + (size_t)v * pw;
 			for (int32_t u = 0; u < pw; u++) {
 				if (row[u] >= 0) {
+					count++;
 					if (v < y0)
 						y0 = v;
 					if (v + 1 > y1)
@@ -68,6 +70,7 @@ void arc_sprites_recompute_bbox(struct arc_sprites *s)
 		s->bbox[i * 4 + 1] = y1;
 		s->bbox[i * 4 + 2] = x0;
 		s->bbox[i * 4 + 3] = x1;
+		s->solid[i] = y1 > y0 && count == (y1 - y0) * (x1 - x0);
 	}
 }
 
@@ -145,6 +148,13 @@ void arc_raw_render(const struct arc_sprites *s, const struct arc_camera *cam,
 		int32_t sx = clamp(s->x[i] - cam->x + pw, 0, cw - pw);
 		int32_t y0 = s->bbox[i * 4 + 0], y1 = s->bbox[i * 4 + 1];
 		int32_t x0 = s->bbox[i * 4 + 2], x1 = s->bbox[i * 4 + 3];
+		if (s->solid[i]) {
+			for (int32_t v = y0; v < y1; v++)
+				memcpy(canvas + (size_t)(sy + v) * cw + sx + x0,
+				       patch + (size_t)v * pw + x0,
+				       (size_t)(x1 - x0));
+			continue;
+		}
 		for (int32_t v = y0; v < y1; v++) {
 			const int8_t *src = patch + (size_t)v * pw;
 			int8_t *dst = canvas + (size_t)(sy + v) * cw + sx;

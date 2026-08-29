@@ -66,6 +66,7 @@ struct arc_game *arc_game_new(const struct arc_level_data *levels,
 	s->tags = calloc((size_t)n * levels->num_tags, 1);
 	s->pixels = calloc((size_t)n * levels->ph * levels->pw, 1);
 	s->overridden = calloc(n, 1);
+	s->solid = calloc(n, 1);
 	s->bbox = calloc((size_t)n * 4, sizeof(int32_t));
 	game->scratch = malloc(sizeof(struct arc_render_scratch));
 	arc_render_scratch_init(game->scratch, &game->atlas);
@@ -88,6 +89,7 @@ void arc_game_free(struct arc_game *game)
 	free(s->tags);
 	free(s->pixels);
 	free(s->overridden);
+	free(s->solid);
 	free(s->bbox);
 	if (game->owns_scratch) {
 		arc_render_scratch_free(game->scratch);
