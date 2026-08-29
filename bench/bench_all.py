@@ -5,8 +5,6 @@ import time
 
 import numpy as np
 
-sys.path.insert(0, str(pathlib.Path("csrc").resolve()))
-sys.path.insert(0, str(pathlib.Path("csrc/games").resolve()))
 
 from harness import differ
 
@@ -19,7 +17,7 @@ ITERS = int(sys.argv[1]) if len(sys.argv) > 1 else 20000
 from harness.clib import Library
 
 library = Library()
-lib = library.lib
+lib = library.sym
 lib.game_bench_split.argtypes = [ctypes.c_void_p, ctypes.c_int32, ctypes.c_uint32,
                                  ctypes.POINTER(ctypes.c_int64),
                                  ctypes.POINTER(ctypes.c_double),

@@ -1,39 +1,11 @@
 import ctypes
-import pathlib
 import sys
 import time
-
-import numpy as np
-
-sys.path.insert(0, str(pathlib.Path("csrc/games").resolve()))
-sys.path.insert(0, str(pathlib.Path("csrc").resolve()))
-
-lib = ctypes.CDLL(str(pathlib.Path("csrc/libm0r0_driver.dylib").resolve()))
-
-
-class LevelData(ctypes.Structure):
-    _fields_ = [(n, ctypes.c_void_p) for n in
-                ("pixels", "h", "w", "x", "y", "layer", "order",
-                 "interaction", "blocking", "alive", "tags", "grid_size")] + [
-        ("num_levels", ctypes.c_int32), ("num_slots", ctypes.c_int32),
-        ("num_tags", ctypes.c_int32), ("ph", ctypes.c_int32),
-        ("pw", ctypes.c_int32), ("win_score", ctypes.c_int32),
-        ("background", ctypes.c_int8), ("letter_box", ctypes.c_int8)]
-
-
-lib.game_new.restype = ctypes.c_void_p
-lib.game_new.argtypes = [ctypes.POINTER(LevelData), ctypes.c_void_p, ctypes.c_void_p,
-                         ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int32,
-                         ctypes.c_int32, ctypes.c_int32]
-lib.game_bench_envs.restype = ctypes.c_int64
-lib.game_bench_envs.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.c_int32,
-                                ctypes.c_int32, ctypes.c_int32, ctypes.c_uint32]
-
 
 from harness import differ
 
 library, game = differ.build("m0r0")
-lib = library.lib
+lib = library.sym
 lib.game_bench_envs.restype = ctypes.c_int64
 lib.game_bench_envs.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.c_int32,
                                 ctypes.c_int32, ctypes.c_int32, ctypes.c_uint32]

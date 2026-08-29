@@ -99,46 +99,6 @@ void arc_render_scratch_free(struct arc_render_scratch *scratch)
 	scratch->sorted = NULL;
 }
 
-#define HIGH_BITS 0x8080808080808080ULL
-
-#ifndef BLEND_WIDE_MIN
-#define BLEND_WIDE_MIN 16
-#endif
-
-static inline void blend_narrow(int8_t *dst, const int8_t *src, int32_t n)
-{
-	for (int32_t u = 0; u < n; u++) {
-		int8_t m = (int8_t)(src[u] >> 7);
-		dst[u] = (int8_t)((dst[u] & m) | (src[u] & ~m));
-	}
-}
-
-static inline void blend_wide(int8_t *dst, const int8_t *src, int32_t n)
-{
-	int32_t u = 0;
-	for (; u + 8 <= n; u += 8) {
-		uint64_t s, d;
-		memcpy(&s, src + u, 8);
-		memcpy(&d, dst + u, 8);
-		uint64_t h = s & HIGH_BITS;
-		uint64_t m = (h - (h >> 7)) | h;
-		uint64_t r = (d & m) | (s & ~m);
-		memcpy(dst + u, &r, 8);
-	}
-	for (; u < n; u++) {
-		int8_t m = (int8_t)(src[u] >> 7);
-		dst[u] = (int8_t)((dst[u] & m) | (src[u] & ~m));
-	}
-}
-
-static inline void blend_row(int8_t *dst, const int8_t *src, int32_t n)
-{
-	if (n >= BLEND_WIDE_MIN)
-		blend_wide(dst, src, n);
-	else
-		blend_narrow(dst, src, n);
-}
-
 static inline int32_t sort_key_ascending(const struct arc_sprites *s, int32_t i)
 {
 	return s->layer[i] * ARC_ORDER_BITS + s->order[i];
@@ -188,7 +148,10 @@ void arc_raw_render(const struct arc_sprites *s, const struct arc_camera *cam,
 		for (int32_t v = y0; v < y1; v++) {
 			const int8_t *src = patch + (size_t)v * pw;
 			int8_t *dst = canvas + (size_t)(sy + v) * cw + sx;
-			blend_row(dst + x0, src + x0, x1 - x0);
+			for (int32_t u = x0; u < x1; u++) {
+				int8_t m = (int8_t)(src[u] >> 7);
+				dst[u] = (int8_t)((dst[u] & m) | (src[u] & ~m));
+			}
 		}
 	}
 

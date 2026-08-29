@@ -175,7 +175,8 @@ struct arc_vec_env *arc_vecenv_new(const struct arc_level_data *levels,
 	for (int32_t t = 0; t < used; t++) {
 		arc_render_scratch_init(&vec->slots[t].scratch,
 					&vec->games[0]->atlas);
-		for (int32_t i = vec->slots[t].start; i < vec->slots[t].end; i++)
+		for (int32_t i = vec->slots[t].start; i < vec->slots[t].end;
+		     i++)
 			arc_game_share_scratch(vec->games[i],
 					       &vec->slots[t].scratch);
 	}
