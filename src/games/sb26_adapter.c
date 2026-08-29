@@ -17,7 +17,7 @@ static void adapt_on_set_level(struct arc_game *game)
 static void adapt_step_once(struct arc_game *game)
 {
 	struct arc_engine_state *e = &game->engine;
-	sb26_step_once(&game->sprites, &game->camera, &game->scratch,
+	sb26_step_once(&game->sprites, &game->camera, game->scratch,
 		       (const struct sb26_static *)game->statics,
 		       e->level_index, e->action_id, e->action_x, e->action_y,
 		       e->action_count, (struct sb26_aux *)game->aux,
@@ -28,7 +28,7 @@ static void adapt_step_once(struct arc_game *game)
 static void adapt_render_interface(struct arc_game *game, int8_t *frame)
 {
 	sb26_render_interface(frame, &game->sprites, &game->camera,
-			      &game->scratch,
+			      game->scratch,
 			      (const struct sb26_static *)game->statics,
 			      (const struct sb26_aux *)game->aux);
 }

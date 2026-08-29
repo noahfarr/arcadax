@@ -67,7 +67,9 @@ struct arc_game *arc_game_new(const struct arc_level_data *levels,
 	s->pixels = calloc((size_t)n * levels->ph * levels->pw, 1);
 	s->overridden = calloc(n, 1);
 	s->bbox = calloc((size_t)n * 4, sizeof(int32_t));
-	arc_render_scratch_init(&game->scratch, &game->atlas);
+	game->scratch = malloc(sizeof(struct arc_render_scratch));
+	arc_render_scratch_init(game->scratch, &game->atlas);
+	game->owns_scratch = 1;
 	return game;
 }
 
@@ -87,8 +89,22 @@ void arc_game_free(struct arc_game *game)
 	free(s->pixels);
 	free(s->overridden);
 	free(s->bbox);
-	arc_render_scratch_free(&game->scratch);
+	if (game->owns_scratch) {
+		arc_render_scratch_free(game->scratch);
+		free(game->scratch);
+	}
 	free(game);
+}
+
+void arc_game_share_scratch(struct arc_game *game,
+			    struct arc_render_scratch *scratch)
+{
+	if (game->owns_scratch) {
+		arc_render_scratch_free(game->scratch);
+		free(game->scratch);
+	}
+	game->scratch = scratch;
+	game->owns_scratch = 0;
 }
 
 void arc_game_complete_action(struct arc_game *game)
@@ -236,7 +252,7 @@ void arc_game_decode_action(const struct arc_game *game, int32_t action,
 
 void arc_game_frame(struct arc_game *game, int8_t *frame)
 {
-	arc_render(&game->sprites, &game->camera, &game->scratch, frame);
+	arc_render(&game->sprites, &game->camera, game->scratch, frame);
 	if (game->hooks->render_interface)
 		game->hooks->render_interface(game, frame);
 }

@@ -69,7 +69,8 @@ struct arc_game {
 	struct arc_sprites sprites;
 	struct arc_camera camera;
 	struct arc_engine_state engine;
-	struct arc_render_scratch scratch;
+	struct arc_render_scratch *scratch;
+	int owns_scratch;
 	const struct arc_level_data *levels;
 	const struct arc_hooks *hooks;
 	void *aux;
@@ -88,6 +89,8 @@ struct arc_game *arc_game_new(const struct arc_level_data *levels,
 			      int32_t num_simple, int32_t has_click,
 			      int32_t max_frames);
 void arc_game_free(struct arc_game *game);
+void arc_game_share_scratch(struct arc_game *game,
+			    struct arc_render_scratch *scratch);
 
 void arc_game_complete_action(struct arc_game *game);
 void arc_game_lose(struct arc_game *game);
