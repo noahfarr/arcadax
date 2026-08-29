@@ -89,7 +89,7 @@ pgo:
 	@echo "=== PGO 2/3: profiling workload ($(PGO_GAMES)) ==="
 	@mkdir -p $(PGO_DIR)
 	@rm -f $(PGO_DIR)/*.profraw
-	LLVM_PROFILE_FILE="$(PGO_DIR)/prof-%p.profraw" $(PYTHON) pgo_workload.py $(PGO_GAMES)
+	LLVM_PROFILE_FILE="$(PGO_DIR)/prof-%p.profraw" $(PYTHON) bench/pgo_workload.py $(PGO_GAMES)
 	$(PROFTOOL) merge -output=$(PROFDATA) $(PGO_DIR)/*.profraw
 	@echo "=== PGO 3/3: optimized rebuild ==="
 	@$(MAKE) clean-obj
@@ -101,18 +101,10 @@ GAMES := ar25 cd82 cn04 dc22 ft09 g50t ka59 lp85 ls20 m0r0 r11l re86 s5i5 sb26 \
 ACTIONS ?= 80
 
 test: $(LIB_HARN)
-	@test -f ref_difftest.py || { \
-	  echo "ref_difftest.py is not on this branch."; \
-	  echo "The differential harnesses live on jax-environments, next to the"; \
-	  echo "JAX implementation and the arcengine reference they compare against."; \
-	  false; }
-	@for g in $(GAMES); do \
-	  printf "%-6s " $$g; $(PYTHON) ref_difftest.py $$g $(ACTIONS) 2>&1 | tail -1; \
-	done
-
+	$(PYTHON) -m harness
 bench: $(LIB_HARN)
-	@test -f bench_all.py || { echo "bench_all.py lives on the jax-environments branch."; false; }
-	$(PYTHON) bench_all.py
+	$(PYTHON) bench/bench_all.py
+
 
 clean-obj:
 	rm -rf $(CORE_OBJ) $(HARN_OBJ) $(FFI_OBJ) $(ALL_OBJ:.o=.d)
@@ -128,7 +120,7 @@ help:
 	@echo "  smoke     $(SMOKE) - standalone scene-backend smoke test"
 	@echo "  lto       rebuild the library with link-time optimization"
 	@echo "  pgo       profile-guided build, 3 stages"
-	@echo "  test      differential sweep against arcengine, all 23 games"
+	@echo "  test      differential sweep against the official Python, all games"
 	@echo "  bench     per-game throughput benchmark"
 	@echo "  clean     remove $(BUILD)"
 	@echo "vars: CC CXX OPT ARCH PYTHON JAX_INCLUDE ACTIONS PGO_GAMES"
