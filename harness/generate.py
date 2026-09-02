@@ -281,7 +281,7 @@ def randomise_appearance(rng, spec, protect=()):
 
 
 def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
-                    hazards=0):
+                    hazards=0, scenery=6):
     from .dsl import (IF_NONE_LEFT, ON_CLICK, ON_ENTER, ON_STEP, REMOVE, Rule,
                       Spec, TOGGLE, WIN_REACH)
 
@@ -318,6 +318,13 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
                               predicate=IF_NONE_LEFT, pred_a=t,
                               effect_a=d, effect_b=floor_k))
     from .dsl import CHASE, PATROL
+
+    scenery_kinds = []
+    for _ in range(min(3, max(0, scenery))):
+        if len(kinds) >= 14:
+            break
+        scenery_kinds.append(len(kinds))
+        kinds.append(Kind(color=int(colors[len(kinds)])))
 
     hazard_kinds = []
     for hz in range(hazards):
@@ -393,6 +400,12 @@ def sample_composed(rng, num_mechanics=3, room_w=3, room_h=5, levels=None,
             spots = [c for c in room_cells(room) if obj[c] == EMPTY]
             if len(spots) > 2:
                 obj[spots[len(spots) // 2]] = hk
+        for _ in range(scenery):
+            room = int(rng.integers(0, used + 1))
+            spots = [c for c in room_cells(room) if obj[c] == EMPTY]
+            if len(spots) > 3 and scenery_kinds:
+                pick = spots[int(rng.integers(len(spots)))]
+                obj[pick] = scenery_kinds[int(rng.integers(len(scenery_kinds)))]
         last = [c for c in room_cells(used) if obj[c] == EMPTY]
         flr[last[-1]] = goal_k
         stack_obj.append(obj)
